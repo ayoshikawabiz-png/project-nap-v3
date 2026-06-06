@@ -40,7 +40,7 @@ export function SetupScreen({ onStart }: Props) {
       {/* Header */}
       <div className="text-center mb-10">
         <div className="text-6xl mb-3">🌙</div>
-        <h1 className="text-2xl font-black tracking-tight text-white">ねむり番</h1>
+        <h1 className="text-2xl font-black tracking-tight text-white">ねむる番</h1>
         <p className="text-[#64748b] text-sm mt-1">タイマー中に動くとアラームが鳴ります</p>
       </div>
 

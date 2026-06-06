@@ -1,6 +1,6 @@
 {
-  "name": "ねむり番",
-  "short_name": "ねむり番",
+  "name": "ねむる番",
+  "short_name": "ねむる番",
   "description": "タイマーをセットして布団の上に置くだけで昼寝を防止するアプリ",
   "start_url": "/",
   "display": "standalone",
