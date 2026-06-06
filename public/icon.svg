@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <rect width="192" height="192" rx="32" fill="#050a14"/>
+  <text x="96" y="130" font-size="100" text-anchor="middle" font-family="sans-serif">🌙</text>
+  <circle cx="96" cy="152" r="12" fill="#38bdf8" opacity="0.8"/>
+  <circle cx="72" cy="148" r="8" fill="#38bdf8" opacity="0.5"/>
+  <circle cx="120" cy="148" r="8" fill="#38bdf8" opacity="0.5"/>
+</svg>
