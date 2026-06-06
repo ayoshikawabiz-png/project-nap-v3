@@ -1,6 +1,9 @@
+// src/utils/audio.ts
+
 let audioCtx: AudioContext | null = null;
 let alarmTimerHandle: number | null = null;
-let alarmGeneration = 0; // incremented each time alarm starts; callbacks check this to self-cancel
+let alarmGeneration = 0;
+let activeOscillators: OscillatorNode[] = []; 
 
 function getCtx(): AudioContext {
   if (!audioCtx || audioCtx.state === 'closed') {
@@ -10,7 +13,6 @@ function getCtx(): AudioContext {
 }
 
 function scheduleBeepBurst(ctx: AudioContext, startAt: number) {
-  // Three urgent rising tones
   const tones = [660, 880, 1100];
   tones.forEach((freq, i) => {
     const osc = ctx.createOscillator();
@@ -28,11 +30,17 @@ function scheduleBeepBurst(ctx: AudioContext, startAt: number) {
 
     osc.start(t);
     osc.stop(t + 0.18);
+
+    activeOscillators.push(osc);
+    
+    osc.onended = () => {
+      activeOscillators = activeOscillators.filter(o => o !== osc);
+    };
   });
 }
 
 function playBurst(generation: number) {
-  if (generation !== alarmGeneration) return; // stale callback — alarm was stopped
+  if (generation !== alarmGeneration) return;
   const ctx = getCtx();
   if (ctx.state === 'suspended') ctx.resume();
   scheduleBeepBurst(ctx, ctx.currentTime + 0.05);
@@ -40,21 +48,31 @@ function playBurst(generation: number) {
 }
 
 export function startAlarm() {
-  stopAlarm(); // ensure any previous alarm is fully cleared first
+  stopAlarm(); 
   alarmGeneration++;
   const gen = alarmGeneration;
   playBurst(gen);
 }
 
 export function stopAlarm() {
-  alarmGeneration++; // invalidate any in-flight playBurst callbacks
+  alarmGeneration++; 
+  
   if (alarmTimerHandle !== null) {
     clearTimeout(alarmTimerHandle);
     alarmTimerHandle = null;
   }
+
+  activeOscillators.forEach(osc => {
+    try {
+      osc.stop();
+      osc.disconnect();
+    } catch (e) {
+      // 既に停止済みの場合は無視
+    }
+  });
+  activeOscillators = [];
 }
 
-/** Must be called from a user-gesture handler to unlock AudioContext on iOS */
 export function unlockAudio() {
   const ctx = getCtx();
   if (ctx.state === 'suspended') ctx.resume();
