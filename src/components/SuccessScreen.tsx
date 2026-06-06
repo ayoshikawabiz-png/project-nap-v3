@@ -17,31 +17,10 @@ export function SuccessScreen({ onRestart }: Props) {
       </div>
 
       {/* Success text */}
-      <h1 className="text-4xl font-black text-white text-center mb-3 leading-tight">
-        すっきり<br />
-        <span className="text-emerald-400">起きられましたね！</span>
+      <h1 className="text-2xl font-black text-white text-center mb-10 leading-relaxed">
+        あなたは生産的な時間を過ごせました。<br />
+        <span className="text-emerald-400">おめでとうございます。</span>
       </h1>
-
-      <p className="text-[#64748b] text-base text-center mb-2">
-        タイマーが終了しました
-      </p>
-
-      {/* Celebration details */}
-      <div className="bg-[#0d1626] border border-[#1e2d45] rounded-2xl p-5 mb-10 w-full max-w-xs">
-        <div className="flex items-center gap-3 mb-3">
-          <span className="text-3xl">🎉</span>
-          <div>
-            <p className="text-white font-bold text-sm">昼寝を防止しました</p>
-            <p className="text-[#64748b] text-xs">布団の上で静止を維持しました</p>
-          </div>
-        </div>
-        <div className="border-t border-[#1e2d45] pt-3">
-          <p className="text-[#94a3b8] text-xs leading-relaxed text-center">
-            この達成感を大切に、<br />
-            活動的な午後を過ごしましょう！
-          </p>
-        </div>
-      </div>
 
       {/* Restart button */}
       <button

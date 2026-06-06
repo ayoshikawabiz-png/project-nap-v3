@@ -1,42 +1,53 @@
-// src/utils/audio.ts
-
 let audioCtx: AudioContext | null = null;
+let masterGain: GainNode | null = null;
 let alarmTimerHandle: number | null = null;
 let alarmGeneration = 0;
-let activeOscillators: OscillatorNode[] = []; 
+const activeOscillators = new Set<OscillatorNode>();
 
 function getCtx(): AudioContext {
   if (!audioCtx || audioCtx.state === 'closed') {
     audioCtx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = 1;
+    masterGain.connect(audioCtx.destination);
   }
   return audioCtx;
 }
 
+function trackOscillator(osc: OscillatorNode) {
+  activeOscillators.add(osc);
+  osc.addEventListener('ended', () => activeOscillators.delete(osc));
+}
+
+function stopAllOscillators() {
+  for (const osc of activeOscillators) {
+    try {
+      osc.stop();
+      osc.disconnect();
+    } catch {
+      // already stopped
+    }
+  }
+  activeOscillators.clear();
+}
+
 function scheduleBeepBurst(ctx: AudioContext, startAt: number) {
-  const tones = [660, 880, 1100];
-  tones.forEach((freq, i) => {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
+  // Soft sine chime — gentle reminder, not an urgent alert
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(masterGain!);
 
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(freq, startAt + i * 0.18);
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(587.33, startAt); // D5
 
-    const t = startAt + i * 0.18;
-    gain.gain.setValueAtTime(0, t);
-    gain.gain.linearRampToValueAtTime(0.6, t + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+  gain.gain.setValueAtTime(0, startAt);
+  gain.gain.linearRampToValueAtTime(0.22, startAt + 0.04);
+  gain.gain.exponentialRampToValueAtTime(0.001, startAt + 0.45);
 
-    osc.start(t);
-    osc.stop(t + 0.18);
-
-    activeOscillators.push(osc);
-    
-    osc.onended = () => {
-      activeOscillators = activeOscillators.filter(o => o !== osc);
-    };
-  });
+  trackOscillator(osc);
+  osc.start(startAt);
+  osc.stop(startAt + 0.5);
 }
 
 function playBurst(generation: number) {
@@ -44,35 +55,37 @@ function playBurst(generation: number) {
   const ctx = getCtx();
   if (ctx.state === 'suspended') ctx.resume();
   scheduleBeepBurst(ctx, ctx.currentTime + 0.05);
-  alarmTimerHandle = window.setTimeout(() => playBurst(generation), 900);
+  alarmTimerHandle = window.setTimeout(() => playBurst(generation), 1600);
 }
 
 export function startAlarm() {
-  stopAlarm(); 
+  stopAlarm();
   alarmGeneration++;
   const gen = alarmGeneration;
   playBurst(gen);
 }
 
 export function stopAlarm() {
-  alarmGeneration++; 
-  
+  alarmGeneration++;
   if (alarmTimerHandle !== null) {
     clearTimeout(alarmTimerHandle);
     alarmTimerHandle = null;
   }
+  stopAllOscillators();
 
-  activeOscillators.forEach(osc => {
-    try {
-      osc.stop();
-      osc.disconnect();
-    } catch (e) {
-      // 既に停止済みの場合は無視
-    }
-  });
-  activeOscillators = [];
+  if (masterGain && audioCtx && audioCtx.state !== 'closed') {
+    masterGain.gain.setValueAtTime(0, audioCtx.currentTime);
+  }
+
+  // Closing the context is required on iOS — scheduled oscillators otherwise keep playing
+  if (audioCtx && audioCtx.state !== 'closed') {
+    audioCtx.close();
+  }
+  audioCtx = null;
+  masterGain = null;
 }
 
+/** Must be called from a user-gesture handler to unlock AudioContext on iOS */
 export function unlockAudio() {
   const ctx = getCtx();
   if (ctx.state === 'suspended') ctx.resume();
