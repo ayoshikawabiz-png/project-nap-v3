@@ -1,6 +1,6 @@
 {
-  "name": "昼寝防止アラーム",
-  "short_name": "昼寝防止",
+  "name": "ねむり番",
+  "short_name": "ねむり番",
   "description": "昼寝を防止するスマートフォンアプリ",
   "start_url": "/",
   "display": "standalone",
