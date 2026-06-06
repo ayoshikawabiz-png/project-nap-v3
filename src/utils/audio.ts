@@ -31,31 +31,58 @@ function stopAllOscillators() {
   activeOscillators.clear();
 }
 
-function scheduleBeepBurst(ctx: AudioContext, startAt: number) {
-  // Soft sine chime — gentle reminder, not an urgent alert
+function scheduleRadialBeep(
+  ctx: AudioContext,
+  startAt: number,
+  frequency: number,
+  duration = 0.09,
+) {
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
-  osc.connect(gain);
+  const filter = ctx.createBiquadFilter();
+
+  filter.type = 'lowpass';
+  filter.frequency.value = 3600;
+  filter.Q.value = 0.7;
+
+  osc.connect(filter);
+  filter.connect(gain);
   gain.connect(masterGain!);
 
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(587.33, startAt); // D5
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(frequency, startAt);
+  osc.frequency.exponentialRampToValueAtTime(frequency * 0.88, startAt + duration);
 
   gain.gain.setValueAtTime(0, startAt);
-  gain.gain.linearRampToValueAtTime(0.22, startAt + 0.04);
-  gain.gain.exponentialRampToValueAtTime(0.001, startAt + 0.45);
+  gain.gain.linearRampToValueAtTime(0.58, startAt + 0.004);
+  gain.gain.exponentialRampToValueAtTime(0.001, startAt + duration);
 
   trackOscillator(osc);
   osc.start(startAt);
-  osc.stop(startAt + 0.5);
+  osc.stop(startAt + duration + 0.02);
+}
+
+function scheduleRadialBurst(ctx: AudioContext, startAt: number) {
+  // iPhone Radial-inspired: rapid high beeps with a descending flourish
+  const beepOn = 0.09;
+  const beepGap = 0.1;
+  const baseFreq = 1870;
+  const pattern = [0, 1, 2, 1, 0, 2];
+
+  for (let i = 0; i < pattern.length; i++) {
+    const step = pattern[i];
+    const frequency = baseFreq - step * 180;
+    const t = startAt + i * (beepOn + beepGap);
+    scheduleRadialBeep(ctx, t, frequency, beepOn);
+  }
 }
 
 function playBurst(generation: number) {
   if (generation !== alarmGeneration) return;
   const ctx = getCtx();
   if (ctx.state === 'suspended') ctx.resume();
-  scheduleBeepBurst(ctx, ctx.currentTime + 0.05);
-  alarmTimerHandle = window.setTimeout(() => playBurst(generation), 1600);
+  scheduleRadialBurst(ctx, ctx.currentTime + 0.05);
+  alarmTimerHandle = window.setTimeout(() => playBurst(generation), 1200);
 }
 
 export function startAlarm() {
