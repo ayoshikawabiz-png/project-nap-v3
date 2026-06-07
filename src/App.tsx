@@ -1,4 +1,5 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { unlockAudio } from './utils/audio';
 import { SetupScreen } from './components/SetupScreen';
 import { ActiveScreen } from './components/ActiveScreen';
 import { AlarmScreen } from './components/AlarmScreen';
@@ -16,6 +17,12 @@ export default function App() {
   // Incremented each time a new timer session starts; used as key to force full remount of ActiveScreen
   const sessionRef = useRef(0);
   const [sessionKey, setSessionKey] = useState(0);
+
+  useEffect(() => {
+    const warm = () => unlockAudio();
+    document.addEventListener('pointerdown', warm, { once: true, passive: true });
+    return () => document.removeEventListener('pointerdown', warm);
+  }, []);
 
   const handleStart = useCallback((duration: number, sens: number) => {
     stopAlarm(); // defensive: ensure any lingering alarm is silenced before new session

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { unlockAudio, playTapSound } from '../utils/audio';
+import { unlockAudio } from '../utils/audio';
+import { onButtonPointerDown } from '../utils/tapFeedback';
 import { requestMotionPermission } from '../hooks/useMotionSensor';
 import { formatHms } from '../utils/time';
 import { loadSettings, saveSettings } from '../utils/settings';
@@ -65,12 +66,6 @@ export function SetupScreen({ onStart }: Props) {
     saveSettings({ hours, minutes, seconds, sensitivity });
   }, [hours, minutes, seconds, sensitivity]);
 
-  const handleStartPointerDown = () => {
-    if (loading || totalSeconds < 1) return;
-    unlockAudio();
-    playTapSound();
-  };
-
   const handleStart = async () => {
     if (totalSeconds < 1) {
       setError('1秒以上に設定してください。');
@@ -97,7 +92,6 @@ export function SetupScreen({ onStart }: Props) {
   };
 
   const applyPreset = (min: number) => {
-    playTapSound();
     setHours(0);
     setMinutes(min);
     setSeconds(0);
@@ -123,6 +117,7 @@ export function SetupScreen({ onStart }: Props) {
           {PRESETS.map((min) => (
             <button
               key={min}
+              onPointerDown={onButtonPointerDown}
               onClick={() => applyPreset(min)}
               className={`rounded-xl py-2.5 text-sm font-bold transition-all duration-200 ${
                 hours === 0 && minutes === min && seconds === 0
@@ -185,7 +180,7 @@ export function SetupScreen({ onStart }: Props) {
 
       {/* Start button */}
       <button
-        onPointerDown={handleStartPointerDown}
+        onPointerDown={onButtonPointerDown}
         onClick={handleStart}
         disabled={loading || totalSeconds < 1}
         className="w-full bg-gradient-to-r from-[#38bdf8] to-[#0ea5e9] text-[#050a14] font-black text-xl rounded-2xl py-5 shadow-2xl shadow-sky-500/30 active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-sky-400/40 hover:from-[#7dd3fc] hover:to-[#38bdf8]"

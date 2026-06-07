@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { stopAlarm, unlockAudio, playTapSound } from '../utils/audio';
+import { stopAlarm } from '../utils/audio';
+import { onButtonPointerDown } from '../utils/tapFeedback';
 
 interface Props {
   onStop: () => void;
@@ -16,8 +17,6 @@ export function AlarmScreen({ onStop }: Props) {
 
   const handleStop = () => {
     stopAlarm();
-    unlockAudio(); // re-unlock AudioContext for the next session (iOS requires user gesture)
-    playTapSound();
     onStop();
   };
 
@@ -74,6 +73,7 @@ export function AlarmScreen({ onStop }: Props) {
 
       {/* Stop alarm button */}
       <button
+        onPointerDown={onButtonPointerDown}
         onClick={handleStop}
         className="w-full max-w-xs bg-gradient-to-r from-red-500 to-orange-500 text-white font-black text-xl rounded-2xl py-5 shadow-2xl shadow-red-500/40 active:scale-95 transition-all duration-200 hover:from-red-400 hover:to-orange-400"
         style={{ boxShadow: flash ? '0 0 30px #ef444460' : '0 8px 20px #ef444430' }}

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useWakeLock } from '../hooks/useWakeLock';
 import { useMotionSensor } from '../hooks/useMotionSensor';
-import { playTapSound } from '../utils/audio';
+import { onButtonPointerDown } from '../utils/tapFeedback';
 import { formatHms } from '../utils/time';
 
 interface Props {
@@ -68,7 +68,6 @@ export function ActiveScreen({ durationSeconds, sensitivity, initialTimeLeft, mo
   }, [onSuccess]);
 
   const handleStop = useCallback(() => {
-    playTapSound();
     setSensorEnabled(false);
     onStop();
   }, [onStop]);
@@ -154,6 +153,7 @@ export function ActiveScreen({ durationSeconds, sensitivity, initialTimeLeft, mo
 
       {/* Stop button */}
       <button
+        onPointerDown={onButtonPointerDown}
         onClick={handleStop}
         className="w-full bg-[#131f30] border border-[#1e2d45] text-[#64748b] font-bold text-base rounded-2xl py-4 active:scale-95 transition-all duration-200 hover:border-[#334155] hover:text-[#94a3b8]"
       >
