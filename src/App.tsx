@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { unlockAudio } from './utils/audio';
+import { unlockAudio, endSessionAudio } from './utils/audio';
 import { SetupScreen } from './components/SetupScreen';
 import { ActiveScreen } from './components/ActiveScreen';
 import { AlarmScreen } from './components/AlarmScreen';
@@ -48,15 +48,17 @@ export default function App() {
   }, []);
 
   const handleSuccess = useCallback(() => {
+    endSessionAudio();
     setAppState('success');
   }, []);
 
   const handleStop = useCallback(() => {
-    stopAlarm();
+    endSessionAudio();
     setAppState('setup');
   }, []);
 
   const handleRestart = useCallback(() => {
+    endSessionAudio();
     setAppState('setup');
   }, []);
 
