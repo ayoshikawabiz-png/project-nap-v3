@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { normalizeHms, hmsToSeconds } from '../utils/time';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { normalizeHms, hmsToSeconds, formatColon } from '../utils/time';
 import { unlockAudio } from '../utils/audio';
 import { onButtonPointerDown } from '../utils/tapFeedback';
 import { requestMotionPermission } from '../hooks/useMotionSensor';
@@ -22,8 +22,10 @@ export function SetupScreen({ onStart }: Props) {
   const [seconds, setSeconds] = useState(initial.seconds);
   const [sensitivity, setSensitivity] = useState(initial.sensitivity);
   const [activeField, setActiveField] = useState<DialField>('minutes');
+  const [isDialOpen, setIsDialOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const dialRef = useRef<HTMLDivElement>(null);
 
   const totalSeconds = hmsToSeconds(hours, minutes, seconds);
 
@@ -37,6 +39,17 @@ export function SetupScreen({ onStart }: Props) {
   useEffect(() => {
     saveSettings({ hours, minutes, seconds, sensitivity });
   }, [hours, minutes, seconds, sensitivity]);
+
+  useEffect(() => {
+    if (isDialOpen) {
+      dialRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [isDialOpen]);
+
+  const openDial = (field?: DialField) => {
+    if (field) setActiveField(field);
+    setIsDialOpen(true);
+  };
 
   const handleStart = async () => {
     if (totalSeconds < 1) {
@@ -66,6 +79,7 @@ export function SetupScreen({ onStart }: Props) {
   const applyPreset = (min: number) => {
     applyTime(0, min, 0);
     setActiveField(min >= 60 ? 'hours' : 'minutes');
+    setIsDialOpen(false);
   };
 
   const isPresetActive = (min: number) => totalSeconds === min * 60;
@@ -86,7 +100,25 @@ export function SetupScreen({ onStart }: Props) {
           タイマー時間
         </h2>
 
-        <div className="flex gap-2 overflow-x-auto pb-1 mb-4 scrollbar-none justify-center flex-wrap">
+        {!isDialOpen ? (
+          <button
+            type="button"
+            onPointerDown={onButtonPointerDown}
+            onClick={() => openDial()}
+            className="w-full rounded-xl bg-[#131f30] border border-[#1e2d45] py-4 mb-4 active:scale-[0.99] transition-all duration-150 hover:border-[#38bdf8]/40"
+          >
+            <p className="text-3xl font-black tabular-nums tracking-wider text-white">
+              {formatColon(totalSeconds)}
+            </p>
+            <p className="text-[#38bdf8] text-xs font-bold mt-1.5">タップしてダイヤルで調整</p>
+          </button>
+        ) : (
+          <p className="text-center text-2xl font-black tabular-nums tracking-wider text-white mb-3">
+            {formatColon(totalSeconds)}
+          </p>
+        )}
+
+        <div className="flex gap-2 overflow-x-auto pb-1 mb-2 scrollbar-none justify-center flex-wrap">
           {PRESETS.map((min) => (
             <button
               key={min}
@@ -103,16 +135,28 @@ export function SetupScreen({ onStart }: Props) {
           ))}
         </div>
 
-        <AppleTimerDial
-          hours={hours}
-          minutes={minutes}
-          seconds={seconds}
-          activeField={activeField}
-          onActiveFieldChange={setActiveField}
-          onHoursChange={(h) => applyTime(h, minutes, seconds)}
-          onMinutesChange={(m) => applyTime(hours, m, seconds)}
-          onSecondsChange={(s) => applyTime(hours, minutes, s)}
-        />
+        {isDialOpen && (
+          <div ref={dialRef} className="border-t border-[#1e2d45] pt-4 mt-2">
+            <AppleTimerDial
+              hours={hours}
+              minutes={minutes}
+              seconds={seconds}
+              activeField={activeField}
+              onActiveFieldChange={setActiveField}
+              onHoursChange={(h) => applyTime(h, minutes, seconds)}
+              onMinutesChange={(m) => applyTime(hours, m, seconds)}
+              onSecondsChange={(s) => applyTime(hours, minutes, s)}
+            />
+            <button
+              type="button"
+              onPointerDown={onButtonPointerDown}
+              onClick={() => setIsDialOpen(false)}
+              className="w-full mt-4 rounded-xl bg-[#131f30] border border-[#1e2d45] py-3 text-[#94a3b8] font-bold text-sm active:scale-[0.98] transition-all hover:border-[#38bdf8]/40 hover:text-white"
+            >
+              完了
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="bg-[#0d1626] rounded-2xl p-5 mb-5 border border-[#1e2d45]">
