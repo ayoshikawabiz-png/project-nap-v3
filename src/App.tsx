@@ -15,6 +15,7 @@ export default function App() {
   const [resumeTimeLeft, setResumeTimeLeft] = useState<number | null>(null);
   const [motionCount, setMotionCount] = useState(0);
   const [alarmCooldownUntil, setAlarmCooldownUntil] = useState(0);
+  const [quickSensorResume, setQuickSensorResume] = useState(false);
   const sessionRef = useRef(0);
   const [sessionKey, setSessionKey] = useState(0);
 
@@ -33,11 +34,13 @@ export default function App() {
     setResumeTimeLeft(null);
     setMotionCount(0);
     setAlarmCooldownUntil(0);
+    setQuickSensorResume(false);
     setAppState('active');
   }, []);
 
   const handleAlarm = useCallback((timeLeft: number) => {
     if (Date.now() < alarmCooldownUntil) return;
+    setQuickSensorResume(false);
     setResumeTimeLeft(timeLeft);
     setMotionCount((c) => c + 1);
     startAlarm();
@@ -47,7 +50,8 @@ export default function App() {
   const handleAlarmStop = useCallback(() => {
     stopAlarm();
     unlockAudio();
-    setAlarmCooldownUntil(Date.now() + 3000);
+    setAlarmCooldownUntil(Date.now() + 800);
+    setQuickSensorResume(true);
     setAppState('active');
   }, []);
 
@@ -82,6 +86,7 @@ export default function App() {
           motionCount={motionCount}
           isPaused={appState === 'alarm'}
           alarmCooldownUntil={alarmCooldownUntil}
+          quickSensorResume={quickSensorResume}
           onAlarm={handleAlarm}
           onSuccess={handleSuccess}
           onStop={handleStop}

@@ -11,6 +11,7 @@ interface Props {
   motionCount: number;
   isPaused: boolean;
   alarmCooldownUntil: number;
+  quickSensorResume: boolean;
   onAlarm: (timeLeft: number) => void;
   onSuccess: () => void;
   onStop: () => void;
@@ -28,6 +29,7 @@ export function ActiveScreen({
   motionCount,
   isPaused,
   alarmCooldownUntil,
+  quickSensorResume,
   onAlarm,
   onSuccess,
   onStop,
@@ -80,6 +82,7 @@ export function ActiveScreen({
     onMotionDetected: handleMotionDetected,
     onMotionLevel: handleMotionLevel,
     onCalibratingChange: setSensorCalibrating,
+    quickResume: quickSensorResume,
   });
 
   useEffect(() => {

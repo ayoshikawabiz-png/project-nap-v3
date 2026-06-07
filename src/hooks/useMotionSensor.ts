@@ -29,6 +29,7 @@ interface UseMotionSensorOptions {
   onMotionDetected: () => void;
   onMotionLevel?: (level: number) => void;
   onCalibratingChange?: (calibrating: boolean) => void;
+  quickResume?: boolean;
 }
 
 function vecMag(v: Vec3): number {
@@ -78,6 +79,7 @@ export function useMotionSensor({
   onMotionDetected,
   onMotionLevel,
   onCalibratingChange,
+  quickResume = false,
 }: UseMotionSensorOptions) {
   const triggeredRef = useRef(false);
   const onMotionDetectedRef = useRef(onMotionDetected);
@@ -101,7 +103,7 @@ export function useMotionSensor({
     let smoothed = 0;
     let calibrated = false;
     const activateAt = Date.now();
-    const calibrationMs = 400;
+    const calibrationMs = quickResume ? 0 : 250;
 
     onCalibratingChangeRef.current?.(true);
     onMotionLevelRef.current?.(0);
@@ -117,7 +119,8 @@ export function useMotionSensor({
         calibrationSamples.push(reading.sample);
         if (calibrationSamples.length > 20) calibrationSamples.shift();
 
-        if (elapsed >= calibrationMs && calibrationSamples.length >= 6) {
+        const minSamples = quickResume ? 3 : 4;
+        if ((quickResume || elapsed >= calibrationMs) && calibrationSamples.length >= minSamples) {
           baseline = lockedMode === 'gravity' ? vecAvg(calibrationSamples) : { x: 0, y: 0, z: 0 };
           calibrated = true;
           smoothed = 0;
@@ -144,5 +147,5 @@ export function useMotionSensor({
       triggeredRef.current = false;
       onCalibratingChangeRef.current?.(false);
     };
-  }, [isActive, threshold]);
+  }, [isActive, threshold, quickResume]);
 }
