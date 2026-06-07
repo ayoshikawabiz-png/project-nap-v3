@@ -11,6 +11,8 @@ export default function App() {
   const [appState, setAppState] = useState<AppState>('setup');
   const [durationMinutes, setDurationMinutes] = useState(20);
   const [sensitivity, setSensitivity] = useState(3);
+  const [resumeTimeLeft, setResumeTimeLeft] = useState<number | null>(null);
+  const [motionCount, setMotionCount] = useState(0);
   // Incremented each time a new timer session starts; used as key to force full remount of ActiveScreen
   const sessionRef = useRef(0);
   const [sessionKey, setSessionKey] = useState(0);
@@ -21,17 +23,21 @@ export default function App() {
     setSessionKey(sessionRef.current);
     setDurationMinutes(duration);
     setSensitivity(sens);
+    setResumeTimeLeft(null);
+    setMotionCount(0);
     setAppState('active');
   }, []);
 
-  const handleAlarm = useCallback(() => {
+  const handleAlarm = useCallback((timeLeft: number) => {
+    setResumeTimeLeft(timeLeft);
+    setMotionCount((c) => c + 1);
     startAlarm();
     setAppState('alarm');
   }, []);
 
   const handleAlarmStop = useCallback(() => {
     stopAlarm();
-    setAppState('setup');
+    setAppState('active');
   }, []);
 
   const handleSuccess = useCallback(() => {
@@ -57,6 +63,8 @@ export default function App() {
           key={sessionKey}
           durationMinutes={durationMinutes}
           sensitivity={sensitivity}
+          initialTimeLeft={resumeTimeLeft ?? durationMinutes * 60}
+          motionCount={motionCount}
           onAlarm={handleAlarm}
           onSuccess={handleSuccess}
           onStop={handleStop}

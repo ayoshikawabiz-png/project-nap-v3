@@ -5,7 +5,9 @@ import { useMotionSensor } from '../hooks/useMotionSensor';
 interface Props {
   durationMinutes: number;
   sensitivity: number;
-  onAlarm: () => void;
+  initialTimeLeft: number;
+  motionCount: number;
+  onAlarm: (timeLeft: number) => void;
   onSuccess: () => void;
   onStop: () => void;
 }
@@ -22,8 +24,8 @@ function sensitivityToThreshold(s: number): number {
   return map[s] ?? 2.5;
 }
 
-export function ActiveScreen({ durationMinutes, sensitivity, onAlarm, onSuccess, onStop }: Props) {
-  const [timeLeft, setTimeLeft] = useState(durationMinutes * 60);
+export function ActiveScreen({ durationMinutes, sensitivity, initialTimeLeft, motionCount, onAlarm, onSuccess, onStop }: Props) {
+  const [timeLeft, setTimeLeft] = useState(initialTimeLeft);
   const [motionLevel, setMotionLevel] = useState(0);
   const [sensorActive, setSensorActive] = useState(false);
   // sensorEnabled is set to false when we're about to leave this screen,
@@ -35,7 +37,10 @@ export function ActiveScreen({ durationMinutes, sensitivity, onAlarm, onSuccess,
 
   const handleMotionDetected = useCallback(() => {
     setSensorEnabled(false); // stop sensor immediately to prevent re-triggering
-    onAlarm();
+    setTimeLeft((t) => {
+      onAlarm(t);
+      return t;
+    });
   }, [onAlarm]);
 
   const handleMotionLevel = useCallback((level: number) => {
@@ -83,9 +88,16 @@ export function ActiveScreen({ durationMinutes, sensitivity, onAlarm, onSuccess,
   return (
     <div className="min-h-screen bg-[#050a14] text-white flex flex-col items-center px-5 py-8 animate-fade-up">
       {/* Status badge */}
-      <div className="flex items-center gap-2 bg-[#0d1626] rounded-full px-4 py-2 mb-8 border border-[#1e2d45]">
-        <span className="w-2 h-2 rounded-full bg-[#34d399] animate-pulse" />
-        <span className="text-[#34d399] text-sm font-bold">監視中</span>
+      <div className="flex flex-col items-center gap-2 mb-8">
+        <div className="flex items-center gap-2 bg-[#0d1626] rounded-full px-4 py-2 border border-[#1e2d45]">
+          <span className="w-2 h-2 rounded-full bg-[#34d399] animate-pulse" />
+          <span className="text-[#34d399] text-sm font-bold">監視中</span>
+        </div>
+        {motionCount > 0 && (
+          <div className="flex items-center gap-2 bg-[#1a0f0f] rounded-full px-4 py-1.5 border border-[#7f1d1d]/50">
+            <span className="text-red-400 text-xs font-bold">動き検知 {motionCount} 回</span>
+          </div>
+        )}
       </div>
 
       {/* Timer ring */}

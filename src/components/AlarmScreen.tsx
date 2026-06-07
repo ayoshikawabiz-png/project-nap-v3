@@ -80,7 +80,10 @@ export function AlarmScreen({ onStop }: Props) {
         アラームを止める
       </button>
 
-      <p className="text-red-900 text-xs mt-4">ボタンを押すまでアラームは鳴り続けます</p>
+      <p className="text-red-900 text-xs mt-4 text-center leading-relaxed">
+        ボタンを押すまでアラームは鳴り続けます<br />
+        止めると残り時間からタイマーに戻ります
+      </p>
     </div>
   );
 }
