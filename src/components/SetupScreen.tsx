@@ -11,26 +11,20 @@ interface Props {
   onStart: (durationSeconds: number, sensitivity: number) => void;
 }
 
-interface TimeSliderProps {
+interface CompactSliderProps {
   label: string;
-  unit: string;
   value: number;
   min: number;
   max: number;
   onChange: (value: number) => void;
 }
 
-function TimeSlider({ label, unit, value, min, max, onChange }: TimeSliderProps) {
+function CompactSlider({ label, value, min, max, onChange }: CompactSliderProps) {
   const percent = max === min ? 0 : ((value - min) / (max - min)) * 100;
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-2">
-        <span className="text-[#64748b] text-xs font-bold">{label}</span>
-        <span className="text-white font-black text-xl tabular-nums">
-          {value}<span className="text-sm font-normal text-[#64748b] ml-0.5">{unit}</span>
-        </span>
-      </div>
+    <div className="flex items-center gap-2.5">
+      <span className="text-[#64748b] text-xs font-bold w-3 shrink-0 text-center">{label}</span>
       <input
         type="range"
         min={min}
@@ -38,15 +32,14 @@ function TimeSlider({ label, unit, value, min, max, onChange }: TimeSliderProps)
         step={1}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full h-2 rounded-full appearance-none cursor-pointer accent-sky-400"
+        className="setup-range flex-1 min-w-0 h-1.5 rounded-full appearance-none cursor-pointer accent-sky-400"
         style={{
           background: `linear-gradient(to right, #38bdf8 ${percent}%, #1e2d45 ${percent}%)`,
         }}
       />
-      <div className="flex justify-between text-[#475569] text-xs mt-1">
-        <span>{min}{unit}</span>
-        <span>{max}{unit}</span>
-      </div>
+      <span className="text-white font-bold text-sm tabular-nums w-7 text-right shrink-0">
+        {String(value).padStart(2, '0')}
+      </span>
     </div>
   );
 }
@@ -97,32 +90,38 @@ export function SetupScreen({ onStart }: Props) {
     setSeconds(0);
   };
 
-  const sensitivityLabel = ['', '低（大きな動きのみ）', '中低', '中（おすすめ）', '中高', '高（微妙な動きも検知）'][sensitivity];
+  const sensitivityLabel = ['', '低', '中低', '中', '中高', '高'][sensitivity];
+  const sensitivityPercent = ((sensitivity - 1) / 4) * 100;
 
   return (
-    <div className="min-h-screen bg-[#050a14] text-white flex flex-col px-5 py-10 animate-fade-up">
+    <div className="min-h-screen bg-[#050a14] text-white flex flex-col px-4 py-5 animate-fade-up">
       {/* Header */}
-      <div className="text-center mb-10">
-        <div className="text-6xl mb-3">🌙</div>
-        <h1 className="text-2xl font-black tracking-tight text-white">ねむる番</h1>
-        <p className="text-[#64748b] text-sm mt-1">タイマー中に動くとアラームが鳴ります</p>
+      <div className="flex items-center gap-3 mb-4">
+        <span className="text-3xl leading-none">🌙</span>
+        <div>
+          <h1 className="text-lg font-black tracking-tight leading-tight">ねむる番</h1>
+          <p className="text-[#64748b] text-xs">動くとアラームが鳴ります</p>
+        </div>
       </div>
 
-      {/* Duration section */}
-      <div className="bg-[#0d1626] rounded-2xl p-5 mb-4 border border-[#1e2d45]">
-        <h2 className="text-[#38bdf8] text-xs font-bold uppercase tracking-widest mb-4">タイマー時間</h2>
+      {/* Settings card */}
+      <div className="bg-[#0d1626] rounded-2xl p-4 mb-3 border border-[#1e2d45]">
+        <div className="text-center mb-3">
+          <p className="text-[#38bdf8] text-[10px] font-bold uppercase tracking-widest mb-1">タイマー時間</p>
+          <p className="text-white font-black text-2xl tabular-nums leading-tight">{formatHms(totalSeconds)}</p>
+        </div>
 
-        {/* Presets */}
-        <div className="grid grid-cols-4 gap-2 mb-5">
+        {/* Presets — horizontal scroll */}
+        <div className="flex gap-1.5 overflow-x-auto pb-1 mb-3 -mx-1 px-1 scrollbar-none">
           {PRESETS.map((min) => (
             <button
               key={min}
               onPointerDown={onButtonPointerDown}
               onClick={() => applyPreset(min)}
-              className={`rounded-xl py-2.5 text-sm font-bold transition-all duration-200 ${
+              className={`shrink-0 rounded-lg px-3 py-1 text-xs font-bold transition-all duration-150 ${
                 hours === 0 && minutes === min && seconds === 0
-                  ? 'bg-[#38bdf8] text-[#050a14] shadow-lg shadow-sky-500/30 scale-105'
-                  : 'bg-[#131f30] text-[#94a3b8] hover:bg-[#1a2d45] hover:text-white active:scale-95'
+                  ? 'bg-[#38bdf8] text-[#050a14]'
+                  : 'bg-[#131f30] text-[#94a3b8] active:scale-95'
               }`}
             >
               {min}分
@@ -130,50 +129,39 @@ export function SetupScreen({ onStart }: Props) {
           ))}
         </div>
 
-        {/* Total preview */}
-        <div className="text-center mb-5">
-          <span className="text-[#64748b] text-xs">設定時間</span>
-          <div className="text-white font-black text-3xl tabular-nums mt-1">
-            {formatHms(totalSeconds)}
+        <div className="space-y-2.5 mb-4">
+          <CompactSlider label="時" value={hours} min={0} max={23} onChange={setHours} />
+          <CompactSlider label="分" value={minutes} min={0} max={59} onChange={setMinutes} />
+          <CompactSlider label="秒" value={seconds} min={0} max={59} onChange={setSeconds} />
+        </div>
+
+        <div className="border-t border-[#1e2d45] pt-3">
+          <div className="flex justify-between items-center mb-1.5">
+            <span className="text-[#38bdf8] text-[10px] font-bold uppercase tracking-widest">センサー感度</span>
+            <span className="text-[#94a3b8] text-xs">{sensitivityLabel}</span>
           </div>
-        </div>
-
-        {/* Hour / minute / second sliders */}
-        <div className="space-y-5">
-          <TimeSlider label="時" unit="時" value={hours} min={0} max={23} onChange={setHours} />
-          <TimeSlider label="分" unit="分" value={minutes} min={0} max={59} onChange={setMinutes} />
-          <TimeSlider label="秒" unit="秒" value={seconds} min={0} max={59} onChange={setSeconds} />
-        </div>
-      </div>
-
-      {/* Sensitivity section */}
-      <div className="bg-[#0d1626] rounded-2xl p-5 mb-6 border border-[#1e2d45]">
-        <h2 className="text-[#38bdf8] text-xs font-bold uppercase tracking-widest mb-4">センサー感度</h2>
-        <div className="flex justify-between items-center mb-2">
-          <span className="text-[#64748b] text-xs">感度</span>
-          <span className="text-[#94a3b8] text-xs">{sensitivityLabel}</span>
-        </div>
-        <input
-          type="range"
-          min={1}
-          max={5}
-          step={1}
-          value={sensitivity}
-          onChange={(e) => setSensitivity(Number(e.target.value))}
-          className="w-full h-2 rounded-full appearance-none cursor-pointer accent-sky-400"
-          style={{
-            background: `linear-gradient(to right, #38bdf8 ${((sensitivity - 1) / 4) * 100}%, #1e2d45 ${((sensitivity - 1) / 4) * 100}%)`,
-          }}
-        />
-        <div className="flex justify-between text-[#475569] text-xs mt-1">
-          <span>低</span>
-          <span>高</span>
+          <input
+            type="range"
+            min={1}
+            max={5}
+            step={1}
+            value={sensitivity}
+            onChange={(e) => setSensitivity(Number(e.target.value))}
+            className="setup-range w-full h-1.5 rounded-full appearance-none cursor-pointer accent-sky-400"
+            style={{
+              background: `linear-gradient(to right, #38bdf8 ${sensitivityPercent}%, #1e2d45 ${sensitivityPercent}%)`,
+            }}
+          />
+          <div className="flex justify-between text-[#475569] text-[10px] mt-0.5">
+            <span>低</span>
+            <span>高</span>
+          </div>
         </div>
       </div>
 
       {/* Error */}
       {error && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 mb-4 text-amber-400 text-sm">
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-2.5 mb-3 text-amber-400 text-xs leading-relaxed">
           {error}
         </div>
       )}
@@ -183,21 +171,24 @@ export function SetupScreen({ onStart }: Props) {
         onPointerDown={onButtonPointerDown}
         onClick={handleStart}
         disabled={loading || totalSeconds < 1}
-        className="w-full bg-gradient-to-r from-[#38bdf8] to-[#0ea5e9] text-[#050a14] font-black text-xl rounded-2xl py-5 shadow-2xl shadow-sky-500/30 active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-sky-400/40 hover:from-[#7dd3fc] hover:to-[#38bdf8]"
+        className="w-full bg-gradient-to-r from-[#38bdf8] to-[#0ea5e9] text-[#050a14] font-black text-base rounded-2xl py-4 shadow-xl shadow-sky-500/25 active:scale-[0.98] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {loading ? '準備中...' : 'タイマー開始！布団の上に置く'}
       </button>
 
-      {/* Instructions */}
-      <div className="mt-6 bg-[#0d1626] rounded-2xl p-4 border border-[#1e2d45]">
-        <h3 className="text-[#38bdf8] text-xs font-bold uppercase tracking-widest mb-2">使い方</h3>
-        <ol className="text-[#64748b] text-sm space-y-1.5">
-          <li><span className="text-[#38bdf8] font-bold">1.</span> 時間を設定してタイマーを開始</li>
+      {/* Instructions — collapsible */}
+      <details className="mt-3 group">
+        <summary className="text-[#475569] text-xs cursor-pointer list-none flex items-center gap-1 select-none">
+          <span className="text-[#64748b] group-open:rotate-90 transition-transform inline-block">▶</span>
+          使い方
+        </summary>
+        <ol className="text-[#64748b] text-xs space-y-1 mt-2 pl-1 leading-relaxed">
+          <li><span className="text-[#38bdf8] font-bold">1.</span> 時間を設定して開始</li>
           <li><span className="text-[#38bdf8] font-bold">2.</span> スマホを掛け布団の上に置く</li>
-          <li><span className="text-[#38bdf8] font-bold">3.</span> 布団が動いたらアラームが鳴ります</li>
-          <li><span className="text-[#38bdf8] font-bold">4.</span> タイマーが終わったら成功！</li>
+          <li><span className="text-[#38bdf8] font-bold">3.</span> 布団が動いたらアラーム</li>
+          <li><span className="text-[#38bdf8] font-bold">4.</span> タイマー終了で成功！</li>
         </ol>
-      </div>
+      </details>
     </div>
   );
 }
