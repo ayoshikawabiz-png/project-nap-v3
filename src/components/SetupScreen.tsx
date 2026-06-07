@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { normalizeHms, hmsToSeconds } from '../utils/time';
 import { unlockAudio } from '../utils/audio';
 import { onButtonPointerDown } from '../utils/tapFeedback';
 import { requestMotionPermission } from '../hooks/useMotionSensor';
@@ -12,7 +13,10 @@ interface Props {
 }
 
 export function SetupScreen({ onStart }: Props) {
-  const [initial] = useState(loadSettings);
+  const [initial] = useState(() => {
+    const saved = loadSettings();
+    return normalizeHms(saved.hours, saved.minutes, saved.seconds);
+  });
   const [hours, setHours] = useState(initial.hours);
   const [minutes, setMinutes] = useState(initial.minutes);
   const [seconds, setSeconds] = useState(initial.seconds);
@@ -21,7 +25,14 @@ export function SetupScreen({ onStart }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const totalSeconds = hours * 3600 + minutes * 60 + seconds;
+  const totalSeconds = hmsToSeconds(hours, minutes, seconds);
+
+  const applyTime = useCallback((h: number, m: number, s: number) => {
+    const n = normalizeHms(h, m, s);
+    setHours(n.hours);
+    setMinutes(n.minutes);
+    setSeconds(n.seconds);
+  }, []);
 
   useEffect(() => {
     saveSettings({ hours, minutes, seconds, sensitivity });
@@ -53,11 +64,11 @@ export function SetupScreen({ onStart }: Props) {
   };
 
   const applyPreset = (min: number) => {
-    setHours(0);
-    setMinutes(min);
-    setSeconds(0);
-    setActiveField('minutes');
+    applyTime(0, min, 0);
+    setActiveField(min >= 60 ? 'hours' : 'minutes');
   };
+
+  const isPresetActive = (min: number) => totalSeconds === min * 60;
 
   const sensitivityLabel = ['', '低（大きな動きのみ）', '中低', '中（おすすめ）', '中高', '高（微妙な動きも検知）'][sensitivity];
   const sensitivityPercent = ((sensitivity - 1) / 4) * 100;
@@ -82,7 +93,7 @@ export function SetupScreen({ onStart }: Props) {
               onPointerDown={onButtonPointerDown}
               onClick={() => applyPreset(min)}
               className={`shrink-0 rounded-xl px-3.5 py-1.5 text-sm font-bold transition-all duration-150 ${
-                hours === 0 && minutes === min && seconds === 0
+                isPresetActive(min)
                   ? 'bg-[#38bdf8] text-[#050a14] shadow-lg shadow-sky-500/25'
                   : 'bg-[#131f30] text-[#94a3b8] hover:bg-[#1a2d45] hover:text-white active:scale-95'
               }`}
@@ -98,9 +109,9 @@ export function SetupScreen({ onStart }: Props) {
           seconds={seconds}
           activeField={activeField}
           onActiveFieldChange={setActiveField}
-          onHoursChange={setHours}
-          onMinutesChange={setMinutes}
-          onSecondsChange={setSeconds}
+          onHoursChange={(h) => applyTime(h, minutes, seconds)}
+          onMinutesChange={(m) => applyTime(hours, m, seconds)}
+          onSecondsChange={(s) => applyTime(hours, minutes, s)}
         />
       </div>
 
