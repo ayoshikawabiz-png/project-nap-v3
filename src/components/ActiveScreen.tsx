@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useWakeLock } from '../hooks/useWakeLock';
 import { useMotionSensor } from '../hooks/useMotionSensor';
 import { onButtonPointerDown } from '../utils/tapFeedback';
-import { formatHms } from '../utils/time';
+import { formatColon } from '../utils/time';
 
 interface Props {
   durationSeconds: number;
@@ -112,7 +112,9 @@ export function ActiveScreen({ durationSeconds, sensitivity, initialTimeLeft, mo
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-2xl font-black tabular-nums text-white tracking-tight text-center px-2 leading-snug">{formatHms(timeLeft)}</span>
+          <span className="text-[1.65rem] font-black tabular-nums text-white tracking-widest leading-none">
+            {formatColon(timeLeft)}
+          </span>
           <span className="text-[#64748b] text-xs mt-1">残り時間</span>
         </div>
       </div>
