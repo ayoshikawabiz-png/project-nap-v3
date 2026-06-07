@@ -101,7 +101,7 @@ export function useMotionSensor({
     let smoothed = 0;
     let calibrated = false;
     const activateAt = Date.now();
-    const calibrationMs = 700;
+    const calibrationMs = 400;
 
     onCalibratingChangeRef.current?.(true);
     onMotionLevelRef.current?.(0);

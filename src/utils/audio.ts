@@ -1,7 +1,7 @@
 let alarmGeneration = 0;
 let alarmBeepTimer: number | null = null;
 let silentLoopUrl: string | null = null;
-let beepUrl: string | null = null;
+let alarmBurstUrl: string | null = null;
 let tapBufferUrl: string | null = null;
 
 let silentAudio: HTMLAudioElement | null = null;
@@ -68,23 +68,35 @@ function getSilentLoopUrl(): string {
   return silentLoopUrl;
 }
 
-function getBeepUrl(): string {
-  if (!beepUrl) {
-    const sampleRate = 44100;
-    const duration = 0.4;
-    const numSamples = Math.floor(sampleRate * duration);
-    const samples = new Float32Array(numSamples);
-    const freq = 880;
+function synthesizeAlarmBurst(sampleRate: number): Float32Array {
+  const duration = 1.2;
+  const numSamples = Math.floor(sampleRate * duration);
+  const samples = new Float32Array(numSamples);
+  const beepOn = 0.09;
+  const beepGap = 0.1;
+  const baseFreq = 1870;
+  const pattern = [0, 1, 2, 1, 0, 2];
 
-    for (let i = 0; i < numSamples; i++) {
-      const t = i / sampleRate;
-      const envelope = Math.min(1, t / 0.01) * Math.exp(-t / 0.15);
-      samples[i] = Math.sin(2 * Math.PI * freq * t) * envelope * 0.5;
+  for (let i = 0; i < pattern.length; i++) {
+    const frequency = baseFreq - pattern[i] * 180;
+    const startSample = Math.floor(i * (beepOn + beepGap) * sampleRate);
+    const endSample = Math.floor((i * (beepOn + beepGap) + beepOn) * sampleRate);
+    for (let s = startSample; s < endSample && s < numSamples; s++) {
+      const t = (s - startSample) / sampleRate;
+      const env = Math.min(1, t / 0.004) * Math.exp(-t / 0.06);
+      const phase = 2 * Math.PI * frequency * t;
+      samples[s] += Math.sign(Math.sin(phase)) * 0.48 * env;
     }
-
-    beepUrl = encodeWav(samples, sampleRate);
   }
-  return beepUrl;
+
+  return samples;
+}
+
+function getAlarmBurstUrl(): string {
+  if (!alarmBurstUrl) {
+    alarmBurstUrl = encodeWav(synthesizeAlarmBurst(44100), 44100);
+  }
+  return alarmBurstUrl;
 }
 
 function createTapWavUrl(): string {
@@ -153,13 +165,13 @@ function scheduleAlarmBeep(gen: number) {
     alarmBeepTimer = null;
   }
 
-  audio.src = getBeepUrl();
+  audio.src = getAlarmBurstUrl();
   audio.volume = 1;
   audio.currentTime = 0;
 
   const scheduleNext = () => {
     if (gen !== alarmGeneration) return;
-    alarmBeepTimer = window.setTimeout(() => scheduleAlarmBeep(gen), 1400);
+    alarmBeepTimer = window.setTimeout(() => scheduleAlarmBeep(gen), 1000);
   };
 
   audio.onended = scheduleNext;
@@ -190,7 +202,7 @@ function startVibration() {
   const pulse = () => navigator.vibrate(pattern);
   pulse();
   if (vibrateTimerHandle !== null) clearInterval(vibrateTimerHandle);
-  vibrateTimerHandle = window.setInterval(pulse, 2000);
+  vibrateTimerHandle = window.setInterval(pulse, 2200);
 }
 
 function stopVibration() {

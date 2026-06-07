@@ -47,7 +47,7 @@ export default function App() {
   const handleAlarmStop = useCallback(() => {
     stopAlarm();
     unlockAudio();
-    setAlarmCooldownUntil(Date.now() + 8000);
+    setAlarmCooldownUntil(Date.now() + 3000);
     setAppState('active');
   }, []);
 
