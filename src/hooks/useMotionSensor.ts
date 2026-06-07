@@ -48,12 +48,14 @@ function vecAvg(samples: Vec3[]): Vec3 {
   return { x: sum.x / n, y: sum.y / n, z: sum.z / n };
 }
 
-function readSample(event: DeviceMotionEvent): { sample: Vec3; mode: 'linear' | 'gravity' } | null {
+function readSample(event: DeviceMotionEvent, lockedMode: 'linear' | 'gravity' | null): { sample: Vec3; mode: 'linear' | 'gravity' } | null {
   const acc = event.acceleration;
-  if (acc && acc.x !== null && acc.y !== null && acc.z !== null) {
-    const sample = { x: acc.x, y: acc.y, z: acc.z };
-    if (vecMag(sample) > 0.02) {
-      return { sample, mode: 'linear' };
+  if (lockedMode === 'linear' || lockedMode === null) {
+    if (acc && acc.x !== null && acc.y !== null && acc.z !== null) {
+      const sample = { x: acc.x, y: acc.y, z: acc.z };
+      if (lockedMode === 'linear' || vecMag(sample) > 0.03) {
+        return { sample, mode: 'linear' };
+      }
     }
   }
 
@@ -95,36 +97,30 @@ export function useMotionSensor({
     triggeredRef.current = false;
     const calibrationSamples: Vec3[] = [];
     let baseline: Vec3 = { x: 0, y: 0, z: 0 };
-    let mode: 'linear' | 'gravity' = 'gravity';
+    let lockedMode: 'linear' | 'gravity' | null = null;
     let smoothed = 0;
     let calibrated = false;
-    let armed = false;
-    let calmSince = 0;
     const activateAt = Date.now();
-    const calibrationMs = 1200;
-    const calmRequiredMs = 2500;
-    const calmThreshold = threshold * 0.35;
+    const calibrationMs = 700;
 
     onCalibratingChangeRef.current?.(true);
     onMotionLevelRef.current?.(0);
 
     const handleMotion = (event: DeviceMotionEvent) => {
-      const reading = readSample(event);
+      const reading = readSample(event, lockedMode);
       if (!reading) return;
 
-      mode = reading.mode;
+      if (lockedMode === null) lockedMode = reading.mode;
       const elapsed = Date.now() - activateAt;
 
       if (!calibrated) {
         calibrationSamples.push(reading.sample);
-        if (calibrationSamples.length > 30) calibrationSamples.shift();
+        if (calibrationSamples.length > 20) calibrationSamples.shift();
 
-        if (elapsed >= calibrationMs && calibrationSamples.length >= 10) {
-          baseline = mode === 'gravity' ? vecAvg(calibrationSamples) : { x: 0, y: 0, z: 0 };
+        if (elapsed >= calibrationMs && calibrationSamples.length >= 6) {
+          baseline = lockedMode === 'gravity' ? vecAvg(calibrationSamples) : { x: 0, y: 0, z: 0 };
           calibrated = true;
           smoothed = 0;
-          calmSince = 0;
-          armed = false;
           onCalibratingChangeRef.current?.(false);
         } else {
           onMotionLevelRef.current?.(0);
@@ -132,19 +128,9 @@ export function useMotionSensor({
         }
       }
 
-      const level = motionLevel(reading.sample, mode, baseline);
-      smoothed = smoothed * 0.55 + level * 0.45;
+      const level = motionLevel(reading.sample, lockedMode, baseline);
+      smoothed = smoothed * 0.5 + level * 0.5;
       onMotionLevelRef.current?.(smoothed);
-
-      if (!armed) {
-        if (smoothed <= calmThreshold) {
-          if (calmSince === 0) calmSince = Date.now();
-          if (Date.now() - calmSince >= calmRequiredMs) armed = true;
-        } else {
-          calmSince = 0;
-        }
-        return;
-      }
 
       if (!triggeredRef.current && smoothed > threshold) {
         triggeredRef.current = true;

@@ -4,8 +4,8 @@ let silentLoopUrl: string | null = null;
 let beepUrl: string | null = null;
 let tapBufferUrl: string | null = null;
 
-let sessionAudio: HTMLAudioElement | null = null;
-let sessionMode: 'idle' | 'silent' | 'alarm' = 'idle';
+let silentAudio: HTMLAudioElement | null = null;
+let alarmAudio: HTMLAudioElement | null = null;
 let vibrateTimerHandle: number | null = null;
 
 type AudioSessionNavigator = Navigator & {
@@ -71,15 +71,15 @@ function getSilentLoopUrl(): string {
 function getBeepUrl(): string {
   if (!beepUrl) {
     const sampleRate = 44100;
-    const duration = 0.42;
+    const duration = 0.4;
     const numSamples = Math.floor(sampleRate * duration);
     const samples = new Float32Array(numSamples);
     const freq = 880;
 
     for (let i = 0; i < numSamples; i++) {
       const t = i / sampleRate;
-      const envelope = Math.min(1, t / 0.01) * Math.exp(-t / 0.14);
-      samples[i] = Math.sin(2 * Math.PI * freq * t) * envelope * 0.55;
+      const envelope = Math.min(1, t / 0.01) * Math.exp(-t / 0.15);
+      samples[i] = Math.sin(2 * Math.PI * freq * t) * envelope * 0.5;
     }
 
     beepUrl = encodeWav(samples, sampleRate);
@@ -108,57 +108,67 @@ function getTapBufferUrl(): string {
   return tapBufferUrl;
 }
 
-function getSessionAudio(): HTMLAudioElement {
-  if (!sessionAudio) {
-    sessionAudio = new Audio();
-    configureMediaElement(sessionAudio);
-  }
-  return sessionAudio;
+function pauseSilentLoop() {
+  silentAudio?.pause();
 }
 
 function startSilentLoop() {
-  if (sessionMode === 'silent') {
-    const audio = sessionAudio;
-    if (audio && !audio.paused) return;
+  if (!silentAudio) {
+    silentAudio = new Audio(getSilentLoopUrl());
+    configureMediaElement(silentAudio);
+    silentAudio.loop = true;
+    silentAudio.volume = 0.001;
   }
+  if (!silentAudio.paused) return;
 
   ensurePlaybackAudioSession();
-  sessionMode = 'silent';
-  const audio = getSessionAudio();
-  audio.pause();
-  audio.src = getSilentLoopUrl();
-  audio.loop = true;
-  audio.volume = 0.001;
-  audio.currentTime = 0;
-  void audio.play().catch(() => {});
+  void silentAudio.play().catch(() => {});
 }
 
 function stopSilentLoop() {
-  if (!sessionAudio) return;
-  sessionAudio.pause();
-  sessionAudio.src = '';
-  sessionAudio = null;
-  sessionMode = 'idle';
+  if (!silentAudio) return;
+  silentAudio.pause();
+  silentAudio.src = '';
+  silentAudio = null;
+}
+
+function getAlarmAudio(): HTMLAudioElement {
+  if (!alarmAudio) {
+    alarmAudio = new Audio();
+    configureMediaElement(alarmAudio);
+    alarmAudio.loop = false;
+  }
+  return alarmAudio;
 }
 
 function scheduleAlarmBeep(gen: number) {
   if (gen !== alarmGeneration) return;
 
-  const audio = getSessionAudio();
-  audio.pause();
+  pauseSilentLoop();
+
+  const audio = getAlarmAudio();
+  audio.onended = null;
+  if (alarmBeepTimer !== null) {
+    clearTimeout(alarmBeepTimer);
+    alarmBeepTimer = null;
+  }
+
   audio.src = getBeepUrl();
-  audio.loop = false;
   audio.volume = 1;
   audio.currentTime = 0;
-  void audio.play().catch(() => {});
 
-  alarmBeepTimer = window.setTimeout(() => scheduleAlarmBeep(gen), 1800);
+  const scheduleNext = () => {
+    if (gen !== alarmGeneration) return;
+    alarmBeepTimer = window.setTimeout(() => scheduleAlarmBeep(gen), 1400);
+  };
+
+  audio.onended = scheduleNext;
+  void audio.play().catch(scheduleNext);
 }
 
 function startAlarmBeeps() {
   ensurePlaybackAudioSession();
-  sessionMode = 'alarm';
-  if (sessionAudio) sessionAudio.pause();
+  pauseSilentLoop();
   scheduleAlarmBeep(alarmGeneration);
 }
 
@@ -167,10 +177,10 @@ function stopAlarmBeeps() {
     clearTimeout(alarmBeepTimer);
     alarmBeepTimer = null;
   }
-  if (sessionAudio && sessionMode === 'alarm') {
-    sessionAudio.pause();
-    sessionAudio.currentTime = 0;
-    sessionMode = 'idle';
+  if (alarmAudio) {
+    alarmAudio.onended = null;
+    alarmAudio.pause();
+    alarmAudio.currentTime = 0;
   }
 }
 
@@ -180,7 +190,7 @@ function startVibration() {
   const pulse = () => navigator.vibrate(pattern);
   pulse();
   if (vibrateTimerHandle !== null) clearInterval(vibrateTimerHandle);
-  vibrateTimerHandle = window.setInterval(pulse, 1800);
+  vibrateTimerHandle = window.setInterval(pulse, 2000);
 }
 
 function stopVibration() {
@@ -216,12 +226,17 @@ export function endSessionAudio() {
 /** Call from a user-gesture handler to unlock audio on iOS */
 export function unlockAudio() {
   ensurePlaybackAudioSession();
-  if (sessionMode !== 'alarm') startSilentLoop();
+  if (!alarmAudio || alarmAudio.paused) startSilentLoop();
 }
 
+let tapAudio: HTMLAudioElement | null = null;
+
 export function playTapSound() {
-  const audio = new Audio(getTapBufferUrl());
-  configureMediaElement(audio);
-  audio.volume = 0.45;
-  void audio.play().catch(() => {});
+  if (!tapAudio) {
+    tapAudio = new Audio(getTapBufferUrl());
+    configureMediaElement(tapAudio);
+    tapAudio.volume = 0.45;
+  }
+  tapAudio.currentTime = 0;
+  void tapAudio.play().catch(() => {});
 }

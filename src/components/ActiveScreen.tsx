@@ -67,12 +67,12 @@ export function ActiveScreen({
   }, [onAlarm, isPaused, alarmCooldownUntil]);
 
   const handleMotionLevel = useCallback((level: number) => {
-    if (!sensorActive || sensorCalibrating) {
+    if (!sensorActive) {
       setMotionLevel(0);
       return;
     }
     setMotionLevel(level);
-  }, [sensorActive, sensorCalibrating]);
+  }, [sensorActive]);
 
   useMotionSensor({
     threshold,
