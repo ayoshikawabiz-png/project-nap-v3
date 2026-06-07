@@ -1,11 +1,10 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 
 export type MotionPermissionState = 'unknown' | 'granted' | 'denied' | 'unavailable';
 
 export async function requestMotionPermission(): Promise<MotionPermissionState> {
   if (typeof DeviceMotionEvent === 'undefined') return 'unavailable';
 
-  // iOS 13+ requires explicit permission
   if (typeof (DeviceMotionEvent as unknown as { requestPermission?: () => Promise<string> }).requestPermission === 'function') {
     try {
       const result = await (DeviceMotionEvent as unknown as { requestPermission: () => Promise<string> }).requestPermission();
@@ -15,7 +14,6 @@ export async function requestMotionPermission(): Promise<MotionPermissionState> 
     }
   }
 
-  // Android / desktop — permission not required
   return 'granted';
 }
 
@@ -24,15 +22,38 @@ interface UseMotionSensorOptions {
   isActive: boolean;
   onMotionDetected: () => void;
   onMotionLevel?: (level: number) => void;
+  onCalibratingChange?: (calibrating: boolean) => void;
 }
 
-export function useMotionSensor({ threshold, isActive, onMotionDetected, onMotionLevel }: UseMotionSensorOptions) {
+function readMagnitude(event: DeviceMotionEvent): number | null {
+  const acc = event.acceleration;
+  if (acc && acc.x !== null && acc.y !== null && acc.z !== null) {
+    return Math.sqrt(acc.x ** 2 + acc.y ** 2 + acc.z ** 2);
+  }
+
+  const accG = event.accelerationIncludingGravity;
+  if (accG && accG.x !== null && accG.y !== null && accG.z !== null) {
+    return Math.sqrt(accG.x ** 2 + accG.y ** 2 + accG.z ** 2);
+  }
+
+  return null;
+}
+
+export function useMotionSensor({
+  threshold,
+  isActive,
+  onMotionDetected,
+  onMotionLevel,
+  onCalibratingChange,
+}: UseMotionSensorOptions) {
   const triggeredRef = useRef(false);
   const onMotionDetectedRef = useRef(onMotionDetected);
   const onMotionLevelRef = useRef(onMotionLevel);
+  const onCalibratingChangeRef = useRef(onCalibratingChange);
 
   useEffect(() => { onMotionDetectedRef.current = onMotionDetected; }, [onMotionDetected]);
   useEffect(() => { onMotionLevelRef.current = onMotionLevel; }, [onMotionLevel]);
+  useEffect(() => { onCalibratingChangeRef.current = onCalibratingChange; }, [onCalibratingChange]);
 
   useEffect(() => {
     if (!isActive) {
@@ -41,27 +62,42 @@ export function useMotionSensor({ threshold, isActive, onMotionDetected, onMotio
     }
 
     triggeredRef.current = false;
+    const calibrationSamples: number[] = [];
+    let baseline = 0;
+    let smoothed = 0;
+    let calibrated = false;
+    const activateAt = Date.now();
+    const calibrationMs = 900;
+
+    onCalibratingChangeRef.current?.(true);
+    onMotionLevelRef.current?.(0);
 
     const handleMotion = (event: DeviceMotionEvent) => {
-      // Prefer acceleration without gravity; fall back to including gravity minus ~9.8
-      const acc = event.acceleration;
-      let magnitude = 0;
+      const raw = readMagnitude(event);
+      if (raw === null) return;
 
-      if (acc && acc.x !== null && acc.y !== null && acc.z !== null) {
-        magnitude = Math.sqrt(acc.x ** 2 + acc.y ** 2 + acc.z ** 2);
-      } else {
-        const accG = event.accelerationIncludingGravity;
-        if (accG && accG.x !== null && accG.y !== null && accG.z !== null) {
-          // Rough magnitude — will include gravitational component
-          magnitude = Math.sqrt(accG.x ** 2 + accG.y ** 2 + accG.z ** 2);
-          // Subtract gravity baseline to get approximate movement
-          magnitude = Math.abs(magnitude - 9.8);
+      const elapsed = Date.now() - activateAt;
+
+      if (!calibrated) {
+        calibrationSamples.push(raw);
+        if (calibrationSamples.length > 24) calibrationSamples.shift();
+
+        if (elapsed >= calibrationMs && calibrationSamples.length >= 8) {
+          baseline = calibrationSamples.reduce((sum, v) => sum + v, 0) / calibrationSamples.length;
+          calibrated = true;
+          smoothed = 0;
+          onCalibratingChangeRef.current?.(false);
+        } else {
+          onMotionLevelRef.current?.(0);
+          return;
         }
       }
 
-      onMotionLevelRef.current?.(magnitude);
+      const delta = Math.abs(raw - baseline);
+      smoothed = smoothed * 0.65 + delta * 0.35;
+      onMotionLevelRef.current?.(smoothed);
 
-      if (!triggeredRef.current && magnitude > threshold) {
+      if (!triggeredRef.current && smoothed > threshold) {
         triggeredRef.current = true;
         onMotionDetectedRef.current();
       }
@@ -71,6 +107,7 @@ export function useMotionSensor({ threshold, isActive, onMotionDetected, onMotio
     return () => {
       window.removeEventListener('devicemotion', handleMotion);
       triggeredRef.current = false;
+      onCalibratingChangeRef.current?.(false);
     };
   }, [isActive, threshold]);
 }

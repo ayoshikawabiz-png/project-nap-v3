@@ -59,6 +59,7 @@ export function SetupScreen({ onStart }: Props) {
     unlockAudio();
 
     const perm = await requestMotionPermission();
+    unlockAudio();
     if (perm === 'denied') {
       setError('センサーへのアクセスが拒否されました。設定から許可してください。');
       setLoading(false);

@@ -3,8 +3,9 @@ let silentLoopUrl: string | null = null;
 let alarmLoopUrl: string | null = null;
 let tapBufferUrl: string | null = null;
 
-let silentLoopAudio: HTMLAudioElement | null = null;
-let alarmHtmlAudio: HTMLAudioElement | null = null;
+/** Single HTML audio element — iOS plays doubled if two elements run at once */
+let sessionAudio: HTMLAudioElement | null = null;
+let sessionMode: 'idle' | 'silent' | 'alarm' = 'idle';
 let vibrateTimerHandle: number | null = null;
 
 let tapCtx: AudioContext | null = null;
@@ -61,8 +62,10 @@ function ensurePlaybackAudioSession() {
   }
 }
 
-function synthesizeAlarmSamples(sampleRate: number, duration: number): Float32Array {
-  const numSamples = Math.floor(sampleRate * duration);
+function synthesizeAlarmSamples(sampleRate: number): Float32Array {
+  const burstDuration = 1.14;
+  const loopDuration = 2.4;
+  const numSamples = Math.floor(sampleRate * loopDuration);
   const samples = new Float32Array(numSamples);
   const beepOn = 0.09;
   const beepGap = 0.1;
@@ -73,7 +76,7 @@ function synthesizeAlarmSamples(sampleRate: number, duration: number): Float32Ar
     const frequency = baseFreq - pattern[i] * 180;
     const startSample = Math.floor(i * (beepOn + beepGap) * sampleRate);
     const endSample = Math.floor((i * (beepOn + beepGap) + beepOn) * sampleRate);
-    for (let s = startSample; s < endSample && s < numSamples; s++) {
+    for (let s = startSample; s < endSample && s < Math.floor(sampleRate * burstDuration); s++) {
       const t = (s - startSample) / sampleRate;
       const env = Math.min(1, t / 0.004) * Math.exp(-t / 0.06);
       const phase = 2 * Math.PI * frequency * t;
@@ -95,7 +98,7 @@ function getSilentLoopUrl(): string {
 
 function getAlarmLoopUrl(): string {
   if (!alarmLoopUrl) {
-    alarmLoopUrl = encodeWav(synthesizeAlarmSamples(44100, 1.2), 44100);
+    alarmLoopUrl = encodeWav(synthesizeAlarmSamples(44100), 44100);
   }
   return alarmLoopUrl;
 }
@@ -121,37 +124,57 @@ function getTapBufferUrl(): string {
   return tapBufferUrl;
 }
 
+function getSessionAudio(): HTMLAudioElement {
+  if (!sessionAudio) {
+    sessionAudio = new Audio();
+    configureMediaElement(sessionAudio);
+  }
+  return sessionAudio;
+}
+
+function playSessionSrc(url: string, loop: boolean, volume: number) {
+  const audio = getSessionAudio();
+  audio.pause();
+  audio.src = url;
+  audio.loop = loop;
+  audio.volume = volume;
+  audio.currentTime = 0;
+  void audio.play().catch(() => {});
+}
+
 function startSilentLoop() {
-  if (silentLoopAudio) return;
-  silentLoopAudio = new Audio(getSilentLoopUrl());
-  configureMediaElement(silentLoopAudio);
-  silentLoopAudio.loop = true;
-  silentLoopAudio.volume = 0.001;
-  void silentLoopAudio.play().catch(() => {});
+  if (sessionMode === 'silent') {
+    const audio = sessionAudio;
+    if (audio && !audio.paused) return;
+  }
+  ensurePlaybackAudioSession();
+  sessionMode = 'silent';
+  playSessionSrc(getSilentLoopUrl(), true, 0.001);
 }
 
 function stopSilentLoop() {
-  if (!silentLoopAudio) return;
-  silentLoopAudio.pause();
-  silentLoopAudio.src = '';
-  silentLoopAudio = null;
+  if (!sessionAudio) return;
+  sessionAudio.pause();
+  sessionAudio.src = '';
+  sessionAudio = null;
+  sessionMode = 'idle';
 }
 
 function startAlarmHtmlLoop() {
-  if (!alarmHtmlAudio) {
-    alarmHtmlAudio = new Audio(getAlarmLoopUrl());
-    configureMediaElement(alarmHtmlAudio);
-    alarmHtmlAudio.loop = true;
-    alarmHtmlAudio.volume = 1;
-  }
-  alarmHtmlAudio.currentTime = 0;
-  void alarmHtmlAudio.play().catch(() => {});
+  ensurePlaybackAudioSession();
+  sessionMode = 'alarm';
+  playSessionSrc(getAlarmLoopUrl(), true, 1);
 }
 
 function stopAlarmHtmlLoop() {
-  if (!alarmHtmlAudio) return;
-  alarmHtmlAudio.pause();
-  alarmHtmlAudio.currentTime = 0;
+  if (sessionMode !== 'alarm') return;
+  const audio = sessionAudio;
+  if (audio) {
+    audio.pause();
+    audio.currentTime = 0;
+  }
+  sessionMode = 'idle';
+  startSilentLoop();
 }
 
 function startVibration() {
@@ -160,7 +183,7 @@ function startVibration() {
   const pulse = () => navigator.vibrate(pattern);
   pulse();
   if (vibrateTimerHandle !== null) clearInterval(vibrateTimerHandle);
-  vibrateTimerHandle = window.setInterval(pulse, 1200);
+  vibrateTimerHandle = window.setInterval(pulse, 2400);
 }
 
 function stopVibration() {
@@ -207,8 +230,6 @@ function playTapHtml() {
 export function startAlarm() {
   stopAlarm();
   alarmGeneration++;
-  ensurePlaybackAudioSession();
-  startSilentLoop();
   startAlarmHtmlLoop();
   startVibration();
 }
@@ -231,11 +252,6 @@ export function unlockAudio() {
 
   const tap = getTapCtx();
   if (tap.state === 'suspended') void tap.resume();
-
-  const prime = new Audio(getTapBufferUrl());
-  configureMediaElement(prime);
-  prime.volume = 0.001;
-  void prime.play().catch(() => {});
 }
 
 export function playTapSound() {
