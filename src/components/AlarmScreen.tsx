@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react';
-import { stopAlarm } from '../utils/audio';
-import { onButtonPointerDown } from '../utils/tapFeedback';
+import { useEffect, useRef, useState } from 'react';
+import { stopAlarm, unlockAudio } from '../utils/audio';
 
 interface Props {
   onStop: () => void;
@@ -8,6 +7,7 @@ interface Props {
 
 export function AlarmScreen({ onStop }: Props) {
   const [flash, setFlash] = useState(true);
+  const stoppedRef = useRef(false);
 
   // Flash background
   useEffect(() => {
@@ -16,7 +16,10 @@ export function AlarmScreen({ onStop }: Props) {
   }, []);
 
   const handleStop = () => {
+    if (stoppedRef.current) return;
+    stoppedRef.current = true;
     stopAlarm();
+    unlockAudio();
     onStop();
   };
 
@@ -73,7 +76,10 @@ export function AlarmScreen({ onStop }: Props) {
 
       {/* Stop alarm button */}
       <button
-        onPointerDown={onButtonPointerDown}
+        onPointerDown={(e) => {
+          if (e.button !== 0) return;
+          handleStop();
+        }}
         onClick={handleStop}
         className="w-full max-w-xs bg-gradient-to-r from-red-500 to-orange-500 text-white font-black text-xl rounded-2xl py-5 shadow-2xl shadow-red-500/40 active:scale-95 transition-all duration-200 hover:from-red-400 hover:to-orange-400"
         style={{ boxShadow: flash ? '0 0 30px #ef444460' : '0 8px 20px #ef444430' }}

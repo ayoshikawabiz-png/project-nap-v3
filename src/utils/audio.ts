@@ -175,15 +175,18 @@ export function stopAlarm() {
     clearTimeout(alarmTimerHandle);
     alarmTimerHandle = null;
   }
-  stopAllOscillators();
 
+  // Mute output first — on iOS, osc.stop() alone may not silence immediately
   if (alarmGain && alarmCtx && alarmCtx.state !== 'closed') {
-    alarmGain.gain.cancelScheduledValues(alarmCtx.currentTime);
-    alarmGain.gain.setValueAtTime(1, alarmCtx.currentTime);
+    const now = alarmCtx.currentTime;
+    alarmGain.gain.cancelScheduledValues(now);
+    alarmGain.gain.setValueAtTime(0, now);
   }
 
+  stopAllOscillators();
+
   if (alarmCtx && alarmCtx.state !== 'closed') {
-    alarmCtx.close();
+    void alarmCtx.close();
   }
   alarmCtx = null;
   alarmGain = null;

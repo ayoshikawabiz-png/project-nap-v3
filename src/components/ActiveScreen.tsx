@@ -26,10 +26,17 @@ export function ActiveScreen({ durationSeconds, sensitivity, initialTimeLeft, mo
   const [sensorActive, setSensorActive] = useState(false);
   // sensorEnabled is set to false when we're about to leave this screen,
   // so the devicemotion listener is removed before the component unmounts.
-  const [sensorEnabled, setSensorEnabled] = useState(true);
+  const [sensorEnabled, setSensorEnabled] = useState(false);
   const threshold = sensitivityToThreshold(sensitivity);
 
   useWakeLock(true);
+
+  // After returning from alarm, wait before re-enabling sensor so button taps don't re-trigger
+  useEffect(() => {
+    const delay = motionCount > 0 ? 2500 : 0;
+    const timer = window.setTimeout(() => setSensorEnabled(true), delay);
+    return () => clearTimeout(timer);
+  }, [motionCount]);
 
   const handleMotionDetected = useCallback(() => {
     setSensorEnabled(false); // stop sensor immediately to prevent re-triggering
