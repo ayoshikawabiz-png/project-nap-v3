@@ -2,9 +2,8 @@ import { useState, useEffect } from 'react';
 import { unlockAudio } from '../utils/audio';
 import { onButtonPointerDown } from '../utils/tapFeedback';
 import { requestMotionPermission } from '../hooks/useMotionSensor';
-import { formatColon } from '../utils/time';
 import { loadSettings, saveSettings } from '../utils/settings';
-import { CircularTimeDial } from './CircularTimeDial';
+import { AppleTimerDial, type DialField } from './AppleTimerDial';
 
 const PRESETS = [5, 10, 15, 20, 30, 45, 60];
 
@@ -18,6 +17,7 @@ export function SetupScreen({ onStart }: Props) {
   const [minutes, setMinutes] = useState(initial.minutes);
   const [seconds, setSeconds] = useState(initial.seconds);
   const [sensitivity, setSensitivity] = useState(initial.sensitivity);
+  const [activeField, setActiveField] = useState<DialField>('minutes');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -56,6 +56,7 @@ export function SetupScreen({ onStart }: Props) {
     setHours(0);
     setMinutes(min);
     setSeconds(0);
+    setActiveField('minutes');
   };
 
   const sensitivityLabel = ['', '低（大きな動きのみ）', '中低', '中（おすすめ）', '中高', '高（微妙な動きも検知）'][sensitivity];
@@ -63,25 +64,18 @@ export function SetupScreen({ onStart }: Props) {
 
   return (
     <div className="min-h-screen bg-[#050a14] text-white flex flex-col px-5 py-7 animate-fade-up">
-      {/* Header */}
-      <div className="text-center mb-6">
+      <div className="text-center mb-5">
         <div className="text-4xl mb-2">🌙</div>
         <h1 className="text-xl font-black tracking-tight">ねむる番</h1>
         <p className="text-[#64748b] text-sm mt-0.5">タイマー中に動くとアラームが鳴ります</p>
       </div>
 
-      {/* Timer settings */}
       <div className="bg-[#0d1626] rounded-2xl p-5 mb-4 border border-[#1e2d45]">
-        <h2 className="text-[#38bdf8] text-xs font-bold uppercase tracking-widest text-center mb-3">
+        <h2 className="text-[#38bdf8] text-xs font-bold uppercase tracking-widest text-center mb-4">
           タイマー時間
         </h2>
 
-        <p className="text-center font-black text-4xl tabular-nums tracking-wider text-white mb-4">
-          {formatColon(totalSeconds)}
-        </p>
-
-        {/* Presets */}
-        <div className="flex gap-2 overflow-x-auto pb-1 mb-5 scrollbar-none justify-center flex-wrap">
+        <div className="flex gap-2 overflow-x-auto pb-1 mb-4 scrollbar-none justify-center flex-wrap">
           {PRESETS.map((min) => (
             <button
               key={min}
@@ -98,16 +92,18 @@ export function SetupScreen({ onStart }: Props) {
           ))}
         </div>
 
-        {/* Circular dials */}
-        <div className="flex justify-center gap-2 sm:gap-4 px-1">
-          <CircularTimeDial label="時" value={hours} min={0} max={23} onChange={setHours} />
-          <CircularTimeDial label="分" value={minutes} min={0} max={59} onChange={setMinutes} />
-          <CircularTimeDial label="秒" value={seconds} min={0} max={59} onChange={setSeconds} />
-        </div>
-        <p className="text-[#475569] text-[11px] text-center mt-3">リングを回して調整</p>
+        <AppleTimerDial
+          hours={hours}
+          minutes={minutes}
+          seconds={seconds}
+          activeField={activeField}
+          onActiveFieldChange={setActiveField}
+          onHoursChange={setHours}
+          onMinutesChange={setMinutes}
+          onSecondsChange={setSeconds}
+        />
       </div>
 
-      {/* Sensitivity */}
       <div className="bg-[#0d1626] rounded-2xl p-5 mb-5 border border-[#1e2d45]">
         <div className="flex justify-between items-center mb-3">
           <h2 className="text-[#38bdf8] text-xs font-bold uppercase tracking-widest">センサー感度</h2>
