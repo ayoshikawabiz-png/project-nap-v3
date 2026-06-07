@@ -1,20 +1,71 @@
 import { useState } from 'react';
-import { unlockAudio } from '../utils/audio';
+import { unlockAudio, playTapSound } from '../utils/audio';
 import { requestMotionPermission } from '../hooks/useMotionSensor';
+import { formatHms } from '../utils/time';
 
 const PRESETS = [5, 10, 15, 20, 30, 45, 60];
 
 interface Props {
-  onStart: (durationMinutes: number, sensitivity: number) => void;
+  onStart: (durationSeconds: number, sensitivity: number) => void;
+}
+
+interface TimeFieldProps {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (value: number) => void;
+}
+
+function TimeField({ label, value, min, max, onChange }: TimeFieldProps) {
+  const step = (delta: number) => {
+    playTapSound();
+    onChange(Math.min(max, Math.max(min, value + delta)));
+  };
+
+  return (
+    <div className="flex flex-col items-center flex-1">
+      <span className="text-[#64748b] text-xs font-bold mb-3">{label}</span>
+      <button
+        type="button"
+        onClick={() => step(1)}
+        disabled={value >= max}
+        className="w-12 h-10 rounded-xl bg-[#131f30] text-[#94a3b8] text-xl font-bold transition-all duration-200 hover:bg-[#1a2d45] hover:text-white active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
+      >
+        +
+      </button>
+      <span className="text-4xl font-black tabular-nums text-white my-3 w-14 text-center">
+        {String(value).padStart(2, '0')}
+      </span>
+      <button
+        type="button"
+        onClick={() => step(-1)}
+        disabled={value <= min}
+        className="w-12 h-10 rounded-xl bg-[#131f30] text-[#94a3b8] text-xl font-bold transition-all duration-200 hover:bg-[#1a2d45] hover:text-white active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
+      >
+        −
+      </button>
+    </div>
+  );
 }
 
 export function SetupScreen({ onStart }: Props) {
-  const [duration, setDuration] = useState(20);
+  const [hours, setHours] = useState(0);
+  const [minutes, setMinutes] = useState(20);
+  const [seconds, setSeconds] = useState(0);
   const [sensitivity, setSensitivity] = useState(3);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const totalSeconds = hours * 3600 + minutes * 60 + seconds;
+
   const handleStart = async () => {
+    if (totalSeconds < 1) {
+      setError('1秒以上に設定してください。');
+      return;
+    }
+
+    playTapSound();
     setLoading(true);
     setError('');
     unlockAudio();
@@ -30,7 +81,14 @@ export function SetupScreen({ onStart }: Props) {
     }
 
     setLoading(false);
-    onStart(duration, sensitivity);
+    onStart(totalSeconds, sensitivity);
+  };
+
+  const applyPreset = (min: number) => {
+    playTapSound();
+    setHours(0);
+    setMinutes(min);
+    setSeconds(0);
   };
 
   const sensitivityLabel = ['', '低（大きな動きのみ）', '中低', '中（おすすめ）', '中高', '高（微妙な動きも検知）'][sensitivity];
@@ -53,9 +111,9 @@ export function SetupScreen({ onStart }: Props) {
           {PRESETS.map((min) => (
             <button
               key={min}
-              onClick={() => setDuration(min)}
+              onClick={() => applyPreset(min)}
               className={`rounded-xl py-2.5 text-sm font-bold transition-all duration-200 ${
-                duration === min
+                hours === 0 && minutes === min && seconds === 0
                   ? 'bg-[#38bdf8] text-[#050a14] shadow-lg shadow-sky-500/30 scale-105'
                   : 'bg-[#131f30] text-[#94a3b8] hover:bg-[#1a2d45] hover:text-white active:scale-95'
               }`}
@@ -65,26 +123,18 @@ export function SetupScreen({ onStart }: Props) {
           ))}
         </div>
 
-        {/* Custom slider */}
-        <div>
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-[#64748b] text-xs">カスタム</span>
-            <span className="text-white font-black text-2xl tabular-nums">{duration}<span className="text-sm font-normal text-[#64748b] ml-1">分</span></span>
+        {/* Hour / minute / second pickers */}
+        <div className="mb-4">
+          <div className="text-center mb-4">
+            <span className="text-[#64748b] text-xs">設定時間</span>
+            <div className="text-white font-black text-3xl tabular-nums mt-1">
+              {formatHms(totalSeconds)}
+            </div>
           </div>
-          <input
-            type="range"
-            min={1}
-            max={90}
-            value={duration}
-            onChange={(e) => setDuration(Number(e.target.value))}
-            className="w-full h-2 rounded-full appearance-none cursor-pointer accent-sky-400"
-            style={{
-              background: `linear-gradient(to right, #38bdf8 ${(duration / 90) * 100}%, #1e2d45 ${(duration / 90) * 100}%)`,
-            }}
-          />
-          <div className="flex justify-between text-[#475569] text-xs mt-1">
-            <span>1分</span>
-            <span>90分</span>
+          <div className="flex gap-2">
+            <TimeField label="時" value={hours} min={0} max={23} onChange={setHours} />
+            <TimeField label="分" value={minutes} min={0} max={59} onChange={setMinutes} />
+            <TimeField label="秒" value={seconds} min={0} max={59} onChange={setSeconds} />
           </div>
         </div>
       </div>
@@ -124,7 +174,7 @@ export function SetupScreen({ onStart }: Props) {
       {/* Start button */}
       <button
         onClick={handleStart}
-        disabled={loading}
+        disabled={loading || totalSeconds < 1}
         className="w-full bg-gradient-to-r from-[#38bdf8] to-[#0ea5e9] text-[#050a14] font-black text-xl rounded-2xl py-5 shadow-2xl shadow-sky-500/30 active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-sky-400/40 hover:from-[#7dd3fc] hover:to-[#38bdf8]"
       >
         {loading ? '準備中...' : 'タイマー開始！布団の上に置く'}

@@ -1,3 +1,5 @@
+import { playTapSound } from '../utils/audio';
+
 interface Props {
   onRestart: () => void;
 }
@@ -24,7 +26,10 @@ export function SuccessScreen({ onRestart }: Props) {
 
       {/* Restart button */}
       <button
-        onClick={onRestart}
+        onClick={() => {
+          playTapSound();
+          onRestart();
+        }}
         className="w-full max-w-xs bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-black text-lg rounded-2xl py-4 shadow-2xl shadow-emerald-500/30 active:scale-95 transition-all duration-200 hover:from-emerald-400 hover:to-teal-400"
       >
         もう一度タイマーを設定する

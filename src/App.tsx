@@ -9,7 +9,7 @@ type AppState = 'setup' | 'active' | 'alarm' | 'success';
 
 export default function App() {
   const [appState, setAppState] = useState<AppState>('setup');
-  const [durationMinutes, setDurationMinutes] = useState(20);
+  const [durationSeconds, setDurationSeconds] = useState(20 * 60);
   const [sensitivity, setSensitivity] = useState(3);
   const [resumeTimeLeft, setResumeTimeLeft] = useState<number | null>(null);
   const [motionCount, setMotionCount] = useState(0);
@@ -21,7 +21,7 @@ export default function App() {
     stopAlarm(); // defensive: ensure any lingering alarm is silenced before new session
     sessionRef.current += 1;
     setSessionKey(sessionRef.current);
-    setDurationMinutes(duration);
+    setDurationSeconds(duration);
     setSensitivity(sens);
     setResumeTimeLeft(null);
     setMotionCount(0);
@@ -61,9 +61,9 @@ export default function App() {
       {appState === 'active' && (
         <ActiveScreen
           key={sessionKey}
-          durationMinutes={durationMinutes}
+          durationSeconds={durationSeconds}
           sensitivity={sensitivity}
-          initialTimeLeft={resumeTimeLeft ?? durationMinutes * 60}
+          initialTimeLeft={resumeTimeLeft ?? durationSeconds}
           motionCount={motionCount}
           onAlarm={handleAlarm}
           onSuccess={handleSuccess}

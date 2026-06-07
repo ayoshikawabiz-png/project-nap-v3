@@ -117,3 +117,29 @@ export function unlockAudio() {
   const ctx = getCtx();
   if (ctx.state === 'suspended') ctx.resume();
 }
+
+/** Short UI tap feedback — call from button onClick handlers */
+export function playTapSound() {
+  const ctx = getCtx();
+  if (ctx.state === 'suspended') ctx.resume();
+
+  const startAt = ctx.currentTime;
+  const duration = 0.055;
+
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(1100, startAt);
+  osc.frequency.exponentialRampToValueAtTime(750, startAt + duration);
+
+  osc.connect(gain);
+  gain.connect(masterGain!);
+
+  gain.gain.setValueAtTime(0, startAt);
+  gain.gain.linearRampToValueAtTime(0.22, startAt + 0.002);
+  gain.gain.exponentialRampToValueAtTime(0.001, startAt + duration);
+
+  osc.start(startAt);
+  osc.stop(startAt + duration + 0.01);
+}

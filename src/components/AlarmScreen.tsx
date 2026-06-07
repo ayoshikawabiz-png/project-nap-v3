@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { stopAlarm, unlockAudio } from '../utils/audio';
+import { stopAlarm, unlockAudio, playTapSound } from '../utils/audio';
 
 interface Props {
   onStop: () => void;
@@ -17,6 +17,7 @@ export function AlarmScreen({ onStop }: Props) {
   const handleStop = () => {
     stopAlarm();
     unlockAudio(); // re-unlock AudioContext for the next session (iOS requires user gesture)
+    playTapSound();
     onStop();
   };
 

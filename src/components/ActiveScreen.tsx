@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useWakeLock } from '../hooks/useWakeLock';
 import { useMotionSensor } from '../hooks/useMotionSensor';
+import { playTapSound } from '../utils/audio';
+import { formatHms } from '../utils/time';
 
 interface Props {
-  durationMinutes: number;
+  durationSeconds: number;
   sensitivity: number;
   initialTimeLeft: number;
   motionCount: number;
@@ -12,19 +14,13 @@ interface Props {
   onStop: () => void;
 }
 
-function formatTime(seconds: number) {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-}
-
 // sensitivity 1-5 → threshold (m/s²): 1→5.0, 2→3.5, 3→2.5, 4→1.5, 5→0.8
 function sensitivityToThreshold(s: number): number {
   const map: Record<number, number> = { 1: 5.0, 2: 3.5, 3: 2.5, 4: 1.5, 5: 0.8 };
   return map[s] ?? 2.5;
 }
 
-export function ActiveScreen({ durationMinutes, sensitivity, initialTimeLeft, motionCount, onAlarm, onSuccess, onStop }: Props) {
+export function ActiveScreen({ durationSeconds, sensitivity, initialTimeLeft, motionCount, onAlarm, onSuccess, onStop }: Props) {
   const [timeLeft, setTimeLeft] = useState(initialTimeLeft);
   const [motionLevel, setMotionLevel] = useState(0);
   const [sensorActive, setSensorActive] = useState(false);
@@ -72,11 +68,12 @@ export function ActiveScreen({ durationMinutes, sensitivity, initialTimeLeft, mo
   }, [onSuccess]);
 
   const handleStop = useCallback(() => {
+    playTapSound();
     setSensorEnabled(false);
     onStop();
   }, [onStop]);
 
-  const progress = 1 - timeLeft / (durationMinutes * 60);
+  const progress = 1 - timeLeft / durationSeconds;
   const motionPercent = Math.min((motionLevel / threshold) * 100, 100);
   const motionColor = motionPercent > 70 ? '#ef4444' : motionPercent > 40 ? '#fb923c' : '#34d399';
 
@@ -116,7 +113,7 @@ export function ActiveScreen({ durationMinutes, sensitivity, initialTimeLeft, mo
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-5xl font-black tabular-nums text-white tracking-tight">{formatTime(timeLeft)}</span>
+          <span className="text-2xl font-black tabular-nums text-white tracking-tight text-center px-2 leading-snug">{formatHms(timeLeft)}</span>
           <span className="text-[#64748b] text-xs mt-1">残り時間</span>
         </div>
       </div>
