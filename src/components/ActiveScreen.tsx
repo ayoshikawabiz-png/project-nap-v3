@@ -10,6 +10,7 @@ interface Props {
   initialTimeLeft: number;
   motionCount: number;
   isPaused: boolean;
+  alarmCooldownUntil: number;
   onAlarm: (timeLeft: number) => void;
   onSuccess: () => void;
   onStop: () => void;
@@ -26,6 +27,7 @@ export function ActiveScreen({
   initialTimeLeft,
   motionCount,
   isPaused,
+  alarmCooldownUntil,
   onAlarm,
   onSuccess,
   onStop,
@@ -33,11 +35,12 @@ export function ActiveScreen({
   const [timeLeft, setTimeLeft] = useState(initialTimeLeft);
   const [motionLevel, setMotionLevel] = useState(0);
   const [sensorCalibrating, setSensorCalibrating] = useState(false);
-  const [sensorEnabled, setSensorEnabled] = useState(false);
-  const [sensorCooldown, setSensorCooldown] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
   const timeLeftRef = useRef(timeLeft);
-  const wasPausedRef = useRef(isPaused);
   const threshold = sensitivityToThreshold(sensitivity);
+
+  const inAlarmCooldown = now < alarmCooldownUntil;
+  const sensorActive = !isPaused && !inAlarmCooldown;
 
   useWakeLock(true);
 
@@ -45,48 +48,35 @@ export function ActiveScreen({
     timeLeftRef.current = timeLeft;
   }, [timeLeft]);
 
-  const resetSensorDisplay = useCallback(() => {
-    setMotionLevel(0);
-    setSensorCalibrating(false);
-  }, []);
+  useEffect(() => {
+    if (!inAlarmCooldown) return;
+    const id = window.setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(id);
+  }, [inAlarmCooldown, alarmCooldownUntil]);
 
   useEffect(() => {
-    if (isPaused) {
-      setSensorEnabled(false);
-      setSensorCooldown(false);
-      resetSensorDisplay();
-      wasPausedRef.current = true;
-      return;
+    if (isPaused || inAlarmCooldown) {
+      setMotionLevel(0);
+      setSensorCalibrating(false);
     }
-
-    resetSensorDisplay();
-
-    if (wasPausedRef.current) {
-      wasPausedRef.current = false;
-      setSensorCooldown(true);
-      const timer = window.setTimeout(() => {
-        setSensorCooldown(false);
-        setSensorEnabled(true);
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-
-    setSensorCooldown(false);
-    setSensorEnabled(true);
-  }, [isPaused, resetSensorDisplay]);
+  }, [isPaused, inAlarmCooldown]);
 
   const handleMotionDetected = useCallback(() => {
-    setSensorEnabled(false);
+    if (isPaused || Date.now() < alarmCooldownUntil) return;
     onAlarm(timeLeftRef.current);
-  }, [onAlarm]);
+  }, [onAlarm, isPaused, alarmCooldownUntil]);
 
   const handleMotionLevel = useCallback((level: number) => {
+    if (!sensorActive || sensorCalibrating) {
+      setMotionLevel(0);
+      return;
+    }
     setMotionLevel(level);
-  }, []);
+  }, [sensorActive, sensorCalibrating]);
 
   useMotionSensor({
     threshold,
-    isActive: sensorEnabled && !isPaused && !sensorCooldown,
+    isActive: sensorActive,
     onMotionDetected: handleMotionDetected,
     onMotionLevel: handleMotionLevel,
     onCalibratingChange: setSensorCalibrating,
@@ -99,7 +89,6 @@ export function ActiveScreen({
       setTimeLeft((t) => {
         if (t <= 1) {
           clearInterval(interval);
-          setSensorEnabled(false);
           onSuccess();
           return 0;
         }
@@ -110,21 +99,23 @@ export function ActiveScreen({
   }, [onSuccess, isPaused]);
 
   const handleStop = useCallback(() => {
-    setSensorEnabled(false);
     onStop();
   }, [onStop]);
 
   const progress = 1 - timeLeft / durationSeconds;
-  const sensorReady = sensorEnabled && !isPaused && !sensorCooldown && !sensorCalibrating;
+  const sensorReady = sensorActive && !sensorCalibrating;
   const motionPercent = sensorReady ? Math.min((motionLevel / threshold) * 100, 100) : 0;
   const motionColor = motionPercent > 70 ? '#ef4444' : motionPercent > 40 ? '#fb923c' : '#34d399';
-  const sensorLabel = isPaused || sensorCooldown
-    ? '再開準備中...'
-    : sensorCalibrating
-      ? '校正中...'
-      : sensorReady
-        ? `${motionLevel.toFixed(2)} m/s²`
-        : '待機中...';
+
+  const sensorLabel = isPaused
+    ? 'アラーム中'
+    : inAlarmCooldown
+      ? '再開準備中...'
+      : sensorCalibrating
+        ? '校正中...'
+        : sensorReady
+          ? `${motionLevel.toFixed(2)} m/s²`
+          : '待機中...';
 
   const r = 80;
   const circ = 2 * Math.PI * r;
@@ -178,11 +169,13 @@ export function ActiveScreen({
         </div>
         <div className="w-full h-3 bg-[#131f30] rounded-full overflow-hidden">
           <div
-            className="h-full rounded-full transition-all duration-150"
+            key={sensorReady ? 'live' : 'idle'}
+            className="h-full rounded-full"
             style={{
               width: `${motionPercent}%`,
-              backgroundColor: motionColor,
-              boxShadow: motionPercent > 40 ? `0 0 8px ${motionColor}` : 'none',
+              backgroundColor: sensorReady ? motionColor : '#334155',
+              boxShadow: sensorReady && motionPercent > 40 ? `0 0 8px ${motionColor}` : 'none',
+              transition: sensorReady ? 'width 150ms linear, background-color 150ms linear' : 'none',
             }}
           />
         </div>

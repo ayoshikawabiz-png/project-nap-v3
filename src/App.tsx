@@ -14,6 +14,7 @@ export default function App() {
   const [sensitivity, setSensitivity] = useState(3);
   const [resumeTimeLeft, setResumeTimeLeft] = useState<number | null>(null);
   const [motionCount, setMotionCount] = useState(0);
+  const [alarmCooldownUntil, setAlarmCooldownUntil] = useState(0);
   const sessionRef = useRef(0);
   const [sessionKey, setSessionKey] = useState(0);
 
@@ -31,19 +32,22 @@ export default function App() {
     setSensitivity(sens);
     setResumeTimeLeft(null);
     setMotionCount(0);
+    setAlarmCooldownUntil(0);
     setAppState('active');
   }, []);
 
   const handleAlarm = useCallback((timeLeft: number) => {
+    if (Date.now() < alarmCooldownUntil) return;
     setResumeTimeLeft(timeLeft);
     setMotionCount((c) => c + 1);
     startAlarm();
     setAppState('alarm');
-  }, []);
+  }, [alarmCooldownUntil]);
 
   const handleAlarmStop = useCallback(() => {
     stopAlarm();
     unlockAudio();
+    setAlarmCooldownUntil(Date.now() + 12000);
     setAppState('active');
   }, []);
 
@@ -77,6 +81,7 @@ export default function App() {
           initialTimeLeft={resumeTimeLeft ?? durationSeconds}
           motionCount={motionCount}
           isPaused={appState === 'alarm'}
+          alarmCooldownUntil={alarmCooldownUntil}
           onAlarm={handleAlarm}
           onSuccess={handleSuccess}
           onStop={handleStop}
