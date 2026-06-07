@@ -13,13 +13,10 @@ interface Props {
 }
 
 export function SetupScreen({ onStart }: Props) {
-  const [initial] = useState(() => {
-    const saved = loadSettings();
-    return normalizeHms(saved.hours, saved.minutes, saved.seconds);
-  });
-  const [hours, setHours] = useState(initial.hours);
-  const [minutes, setMinutes] = useState(initial.minutes);
-  const [seconds, setSeconds] = useState(initial.seconds);
+  const [initial] = useState(() => loadSettings());
+  const [hours, setHours] = useState(() => normalizeHms(initial.hours, initial.minutes, initial.seconds).hours);
+  const [minutes, setMinutes] = useState(() => normalizeHms(initial.hours, initial.minutes, initial.seconds).minutes);
+  const [seconds, setSeconds] = useState(() => normalizeHms(initial.hours, initial.minutes, initial.seconds).seconds);
   const [sensitivity, setSensitivity] = useState(initial.sensitivity);
   const [activeField, setActiveField] = useState<DialField>('minutes');
   const [isDialOpen, setIsDialOpen] = useState(false);

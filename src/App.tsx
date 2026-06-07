@@ -14,7 +14,6 @@ export default function App() {
   const [sensitivity, setSensitivity] = useState(3);
   const [resumeTimeLeft, setResumeTimeLeft] = useState<number | null>(null);
   const [motionCount, setMotionCount] = useState(0);
-  // Incremented each time a new timer session starts; used as key to force full remount of ActiveScreen
   const sessionRef = useRef(0);
   const [sessionKey, setSessionKey] = useState(0);
 
@@ -25,7 +24,7 @@ export default function App() {
   }, []);
 
   const handleStart = useCallback((duration: number, sens: number) => {
-    stopAlarm(); // defensive: ensure any lingering alarm is silenced before new session
+    stopAlarm();
     sessionRef.current += 1;
     setSessionKey(sessionRef.current);
     setDurationSeconds(duration);
@@ -44,6 +43,7 @@ export default function App() {
 
   const handleAlarmStop = useCallback(() => {
     stopAlarm();
+    unlockAudio();
     setAppState('active');
   }, []);
 
@@ -62,25 +62,30 @@ export default function App() {
     setAppState('setup');
   }, []);
 
+  const timerActive = appState === 'active' || appState === 'alarm';
+
   return (
     <div className="max-w-md mx-auto">
       {appState === 'setup' && (
         <SetupScreen onStart={handleStart} />
       )}
-      {appState === 'active' && (
+      {timerActive && (
         <ActiveScreen
           key={sessionKey}
           durationSeconds={durationSeconds}
           sensitivity={sensitivity}
           initialTimeLeft={resumeTimeLeft ?? durationSeconds}
           motionCount={motionCount}
+          isPaused={appState === 'alarm'}
           onAlarm={handleAlarm}
           onSuccess={handleSuccess}
           onStop={handleStop}
         />
       )}
       {appState === 'alarm' && (
-        <AlarmScreen onStop={handleAlarmStop} />
+        <div className="fixed inset-0 z-50">
+          <AlarmScreen onStop={handleAlarmStop} />
+        </div>
       )}
       {appState === 'success' && (
         <SuccessScreen onRestart={handleRestart} />

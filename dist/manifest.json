@@ -1,7 +1,7 @@
 {
-  "name": "昼寝防止アラーム",
-  "short_name": "昼寝防止",
-  "description": "昼寝を防止するスマートフォンアプリ",
+  "name": "ねむる番",
+  "short_name": "ねむる番",
+  "description": "タイマーをセットして布団の上に置くだけで昼寝を防止するアプリ",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",

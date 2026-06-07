@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { stopAlarm, unlockAudio } from '../utils/audio';
 
 interface Props {
   onStop: () => void;
@@ -9,7 +8,6 @@ export function AlarmScreen({ onStop }: Props) {
   const [flash, setFlash] = useState(true);
   const stoppedRef = useRef(false);
 
-  // Flash background
   useEffect(() => {
     const interval = setInterval(() => setFlash((f) => !f), 500);
     return () => clearInterval(interval);
@@ -18,8 +16,6 @@ export function AlarmScreen({ onStop }: Props) {
   const handleStop = () => {
     if (stoppedRef.current) return;
     stoppedRef.current = true;
-    stopAlarm();
-    unlockAudio();
     onStop();
   };
 
@@ -28,7 +24,6 @@ export function AlarmScreen({ onStop }: Props) {
       className="min-h-screen flex flex-col items-center justify-center px-6 transition-colors duration-300"
       style={{ backgroundColor: flash ? '#1a0000' : '#0a0000' }}
     >
-      {/* Warning icon ring */}
       <div className="relative mb-6">
         <div
           className="w-32 h-32 rounded-full flex items-center justify-center border-4"
@@ -41,7 +36,6 @@ export function AlarmScreen({ onStop }: Props) {
         >
           <span className="text-6xl animate-bounce">⚠️</span>
         </div>
-        {/* Ripple rings */}
         <div
           className="absolute inset-0 rounded-full border-2 border-red-500 opacity-50"
           style={{
@@ -50,7 +44,6 @@ export function AlarmScreen({ onStop }: Props) {
         />
       </div>
 
-      {/* Main warning text */}
       <h1
         className="text-5xl font-black text-center mb-3 leading-tight"
         style={{
@@ -74,15 +67,11 @@ export function AlarmScreen({ onStop }: Props) {
         </p>
       </div>
 
-      {/* Stop alarm button */}
       <button
-        onPointerDown={(e) => {
-          if (e.button !== 0) return;
-          handleStop();
-        }}
+        type="button"
         onClick={handleStop}
         className="w-full max-w-xs bg-gradient-to-r from-red-500 to-orange-500 text-white font-black text-xl rounded-2xl py-5 shadow-2xl shadow-red-500/40 active:scale-95 transition-all duration-200 hover:from-red-400 hover:to-orange-400"
-        style={{ boxShadow: flash ? '0 0 30px #ef444460' : '0 8px 20px #ef444430' }}
+        style={{ boxShadow: flash ? '0 0 30px #ef444460' : '0 8px 20px #ef444430', touchAction: 'manipulation' }}
       >
         アラームを止める
       </button>

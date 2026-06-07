@@ -1,16 +1,20 @@
-let alarmCtx: AudioContext | null = null;
-let alarmGain: GainNode | null = null;
-let alarmTimerHandle: number | null = null;
 let alarmGeneration = 0;
-const activeOscillators = new Set<OscillatorNode>();
-
-let tapCtx: AudioContext | null = null;
+let silentLoopUrl: string | null = null;
+let alarmLoopUrl: string | null = null;
 let tapBufferUrl: string | null = null;
 
-function createTapWavUrl(): string {
-  const sampleRate = 44100;
-  const duration = 0.055;
-  const numSamples = Math.floor(sampleRate * duration);
+let silentLoopAudio: HTMLAudioElement | null = null;
+let alarmHtmlAudio: HTMLAudioElement | null = null;
+let vibrateTimerHandle: number | null = null;
+
+let tapCtx: AudioContext | null = null;
+
+type AudioSessionNavigator = Navigator & {
+  audioSession?: { type: string };
+};
+
+function encodeWav(samples: Float32Array, sampleRate: number): string {
+  const numSamples = samples.length;
   const bytesPerSample = 2;
   const dataSize = numSamples * bytesPerSample;
   const buffer = new ArrayBuffer(44 + dataSize);
@@ -35,14 +39,81 @@ function createTapWavUrl(): string {
   view.setUint32(40, dataSize, true);
 
   for (let i = 0; i < numSamples; i++) {
-    const t = i / sampleRate;
-    const freq = 1100 * Math.exp(Math.log(750 / 1100) * (t / duration));
-    const envelope = Math.min(1, t / 0.002) * Math.exp(-t / 0.018);
-    const sample = Math.sin(2 * Math.PI * freq * t) * envelope * 0.35;
-    view.setInt16(44 + i * 2, Math.max(-32767, Math.min(32767, Math.floor(sample * 32767))), true);
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(44 + i * 2, Math.floor(s * 32767), true);
   }
 
   return URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }));
+}
+
+function configureMediaElement(audio: HTMLAudioElement) {
+  audio.setAttribute('playsinline', '');
+  audio.setAttribute('webkit-playsinline', '');
+}
+
+function ensurePlaybackAudioSession() {
+  const session = (navigator as AudioSessionNavigator).audioSession;
+  if (!session) return;
+  try {
+    session.type = 'playback';
+  } catch {
+    // unsupported
+  }
+}
+
+function synthesizeAlarmSamples(sampleRate: number, duration: number): Float32Array {
+  const numSamples = Math.floor(sampleRate * duration);
+  const samples = new Float32Array(numSamples);
+  const beepOn = 0.09;
+  const beepGap = 0.1;
+  const baseFreq = 1870;
+  const pattern = [0, 1, 2, 1, 0, 2];
+
+  for (let i = 0; i < pattern.length; i++) {
+    const frequency = baseFreq - pattern[i] * 180;
+    const startSample = Math.floor(i * (beepOn + beepGap) * sampleRate);
+    const endSample = Math.floor((i * (beepOn + beepGap) + beepOn) * sampleRate);
+    for (let s = startSample; s < endSample && s < numSamples; s++) {
+      const t = (s - startSample) / sampleRate;
+      const env = Math.min(1, t / 0.004) * Math.exp(-t / 0.06);
+      const phase = 2 * Math.PI * frequency * t;
+      samples[s] += Math.sign(Math.sin(phase)) * 0.55 * env;
+    }
+  }
+
+  return samples;
+}
+
+function getSilentLoopUrl(): string {
+  if (!silentLoopUrl) {
+    const sampleRate = 44100;
+    const duration = 0.25;
+    silentLoopUrl = encodeWav(new Float32Array(Math.floor(sampleRate * duration)), sampleRate);
+  }
+  return silentLoopUrl;
+}
+
+function getAlarmLoopUrl(): string {
+  if (!alarmLoopUrl) {
+    alarmLoopUrl = encodeWav(synthesizeAlarmSamples(44100, 1.2), 44100);
+  }
+  return alarmLoopUrl;
+}
+
+function createTapWavUrl(): string {
+  const sampleRate = 44100;
+  const duration = 0.055;
+  const numSamples = Math.floor(sampleRate * duration);
+  const samples = new Float32Array(numSamples);
+
+  for (let i = 0; i < numSamples; i++) {
+    const t = i / sampleRate;
+    const freq = 1100 * Math.exp(Math.log(750 / 1100) * (t / duration));
+    const envelope = Math.min(1, t / 0.002) * Math.exp(-t / 0.018);
+    samples[i] = Math.sin(2 * Math.PI * freq * t) * envelope * 0.35;
+  }
+
+  return encodeWav(samples, sampleRate);
 }
 
 function getTapBufferUrl(): string {
@@ -50,10 +121,54 @@ function getTapBufferUrl(): string {
   return tapBufferUrl;
 }
 
-function playTapHtml() {
-  const audio = new Audio(getTapBufferUrl());
-  audio.volume = 0.45;
-  void audio.play().catch(() => {});
+function startSilentLoop() {
+  if (silentLoopAudio) return;
+  silentLoopAudio = new Audio(getSilentLoopUrl());
+  configureMediaElement(silentLoopAudio);
+  silentLoopAudio.loop = true;
+  silentLoopAudio.volume = 0.001;
+  void silentLoopAudio.play().catch(() => {});
+}
+
+function stopSilentLoop() {
+  if (!silentLoopAudio) return;
+  silentLoopAudio.pause();
+  silentLoopAudio.src = '';
+  silentLoopAudio = null;
+}
+
+function startAlarmHtmlLoop() {
+  if (!alarmHtmlAudio) {
+    alarmHtmlAudio = new Audio(getAlarmLoopUrl());
+    configureMediaElement(alarmHtmlAudio);
+    alarmHtmlAudio.loop = true;
+    alarmHtmlAudio.volume = 1;
+  }
+  alarmHtmlAudio.currentTime = 0;
+  void alarmHtmlAudio.play().catch(() => {});
+}
+
+function stopAlarmHtmlLoop() {
+  if (!alarmHtmlAudio) return;
+  alarmHtmlAudio.pause();
+  alarmHtmlAudio.currentTime = 0;
+}
+
+function startVibration() {
+  if (!navigator.vibrate) return;
+  const pattern = [280, 120, 280, 120, 280];
+  const pulse = () => navigator.vibrate(pattern);
+  pulse();
+  if (vibrateTimerHandle !== null) clearInterval(vibrateTimerHandle);
+  vibrateTimerHandle = window.setInterval(pulse, 1200);
+}
+
+function stopVibration() {
+  if (vibrateTimerHandle !== null) {
+    clearInterval(vibrateTimerHandle);
+    vibrateTimerHandle = null;
+  }
+  navigator.vibrate?.(0);
 }
 
 function getTapCtx(): AudioContext {
@@ -82,136 +197,47 @@ function scheduleTapOscillator(ctx: AudioContext, startAt: number) {
   osc.stop(startAt + duration + 0.01);
 }
 
-function getAlarmCtx(): AudioContext {
-  if (!alarmCtx || alarmCtx.state === 'closed') {
-    alarmCtx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-    alarmGain = alarmCtx.createGain();
-    alarmGain.gain.value = 1;
-    alarmGain.connect(alarmCtx.destination);
-  }
-  return alarmCtx;
-}
-
-function trackOscillator(osc: OscillatorNode) {
-  activeOscillators.add(osc);
-  osc.addEventListener('ended', () => activeOscillators.delete(osc));
-}
-
-function stopAllOscillators() {
-  for (const osc of activeOscillators) {
-    try {
-      osc.stop();
-      osc.disconnect();
-    } catch {
-      // already stopped
-    }
-  }
-  activeOscillators.clear();
-}
-
-function scheduleRadialBeep(
-  ctx: AudioContext,
-  startAt: number,
-  frequency: number,
-  duration = 0.09,
-) {
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  const filter = ctx.createBiquadFilter();
-
-  filter.type = 'lowpass';
-  filter.frequency.value = 3600;
-  filter.Q.value = 0.7;
-
-  osc.connect(filter);
-  filter.connect(gain);
-  gain.connect(alarmGain!);
-
-  osc.type = 'square';
-  osc.frequency.setValueAtTime(frequency, startAt);
-  osc.frequency.exponentialRampToValueAtTime(frequency * 0.88, startAt + duration);
-
-  gain.gain.setValueAtTime(0, startAt);
-  gain.gain.linearRampToValueAtTime(0.58, startAt + 0.004);
-  gain.gain.exponentialRampToValueAtTime(0.001, startAt + duration);
-
-  trackOscillator(osc);
-  osc.start(startAt);
-  osc.stop(startAt + duration + 0.02);
-}
-
-function scheduleRadialBurst(ctx: AudioContext, startAt: number) {
-  const beepOn = 0.09;
-  const beepGap = 0.1;
-  const baseFreq = 1870;
-  const pattern = [0, 1, 2, 1, 0, 2];
-
-  for (let i = 0; i < pattern.length; i++) {
-    const step = pattern[i];
-    const frequency = baseFreq - step * 180;
-    const t = startAt + i * (beepOn + beepGap);
-    scheduleRadialBeep(ctx, t, frequency, beepOn);
-  }
-}
-
-function playBurst(generation: number) {
-  if (generation !== alarmGeneration) return;
-  const ctx = getAlarmCtx();
-  if (ctx.state === 'suspended') void ctx.resume();
-  scheduleRadialBurst(ctx, ctx.currentTime + 0.05);
-  alarmTimerHandle = window.setTimeout(() => playBurst(generation), 1200);
+function playTapHtml() {
+  const audio = new Audio(getTapBufferUrl());
+  configureMediaElement(audio);
+  audio.volume = 0.45;
+  void audio.play().catch(() => {});
 }
 
 export function startAlarm() {
   stopAlarm();
   alarmGeneration++;
-  const gen = alarmGeneration;
-  playBurst(gen);
+  ensurePlaybackAudioSession();
+  startSilentLoop();
+  startAlarmHtmlLoop();
+  startVibration();
 }
 
 export function stopAlarm() {
   alarmGeneration++;
-  if (alarmTimerHandle !== null) {
-    clearTimeout(alarmTimerHandle);
-    alarmTimerHandle = null;
-  }
-
-  // Mute output first — on iOS, osc.stop() alone may not silence immediately
-  if (alarmGain && alarmCtx && alarmCtx.state !== 'closed') {
-    const now = alarmCtx.currentTime;
-    alarmGain.gain.cancelScheduledValues(now);
-    alarmGain.gain.setValueAtTime(0, now);
-  }
-
-  stopAllOscillators();
-
-  if (alarmCtx && alarmCtx.state !== 'closed') {
-    void alarmCtx.close();
-  }
-  alarmCtx = null;
-  alarmGain = null;
+  stopAlarmHtmlLoop();
+  stopVibration();
 }
 
 export function endSessionAudio() {
   stopAlarm();
+  stopSilentLoop();
 }
 
 /** Call from a user-gesture handler to unlock audio on iOS */
 export function unlockAudio() {
+  ensurePlaybackAudioSession();
+  startSilentLoop();
+
   const tap = getTapCtx();
   if (tap.state === 'suspended') void tap.resume();
 
-  const alarm = alarmCtx;
-  if (alarm && alarm.state !== 'closed' && alarm.state === 'suspended') {
-    void alarm.resume();
-  }
-
   const prime = new Audio(getTapBufferUrl());
+  configureMediaElement(prime);
   prime.volume = 0.001;
   void prime.play().catch(() => {});
 }
 
-/** Short UI tap feedback — use with onPointerDown for reliable mobile playback */
 export function playTapSound() {
   try {
     const ctx = getTapCtx();
